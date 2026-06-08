@@ -407,7 +407,7 @@
 
     async function fetchData() {
       try {
-        // 1. 抓取目前選定節點的資料 (用於溫度、濕度、空氣品質、環境分數)
+        // 1. 抓取目前選定節點的資料
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error("API 回應異常");
         const data = await response.json();
@@ -418,10 +418,9 @@
           return;
         }
 
-        // 2. [關鍵修改] 另外去抓取實體感測器所在的節點資料 (這裡固定為 JETSON_NANO_01)
-        //    如果你的實體感測器是接在 02，請把下方字串改成 JETSON_NANO_02
+        // 2. 抓取實體感測器所在的節點資料 (固定為 JETSON_NANO_01)
         const HARDWARE_NODE = "JETSON_NANO_01"; 
-        let hardwareData = data; // 預設如果剛好是 01，就直接用同一個資料
+        let hardwareData = data; 
         
         if (NODE_ID !== HARDWARE_NODE) {
           try {
@@ -434,10 +433,10 @@
           }
         }
 
-        // 3. 更新基本資訊 (當前切換的廁所)
-        document.getElementById('node-name-display').innerText = data.area_name;
+        // 3. 更新基本資訊 (加上防呆，如果沒有 area_name 就顯示預設值)
+        document.getElementById('node-name-display').innerText = data.area_name || "系統連線中";
         document.getElementById('last-update').innerText = new Date().toLocaleTimeString();
-        document.getElementById('env-score').innerText = data.env_score;
+        document.getElementById('env-score').innerText = data.env_score || "--";
        
         // 更新分數顏色環
         const scoreCircle = document.getElementById('score-circle');
@@ -445,19 +444,19 @@
         else if (data.env_score >= 60) scoreCircle.style.borderColor = "var(--c-warn)";
         else scoreCircle.style.borderColor = "var(--c-bad)";
 
-        // 4. 更新數值 (各自獨立的溫濕度、空氣品質)
-        updateValue('val-temp', data.sensors.temp.toFixed(1));
-        updateValue('val-hum', data.sensors.hum.toFixed(0));
-        updateValue('val-ppm', data.sensors.mq135.toFixed(0));
+        // 4. 更新數值 (加上安全判斷，避免 toFixed 報錯)
+        if (data.sensors) {
+            updateValue('val-temp', data.sensors.temp ? data.sensors.temp.toFixed(1) : "--");
+            updateValue('val-hum', data.sensors.hum ? data.sensors.hum.toFixed(0) : "--");
+            updateValue('val-ppm', data.sensors.mq135 ? data.sensors.mq135.toFixed(0) : "--");
 
-        // 5. 更新燈號
-        updateLed('led-temp', data.sensors.temp > 30 ? 'bad' : (data.sensors.temp > 28 ? 'warn' : 'good'));
-        updateLed('led-hum', data.sensors.hum > 80 ? 'warn' : 'good');
-        updateLed('led-ppm', data.sensors.mq135 > 150 ? 'warn' : (data.sensors.mq135 > 200 ? 'bad' : 'good'));
+            // 5. 更新燈號
+            updateLed('led-temp', data.sensors.temp > 30 ? 'bad' : (data.sensors.temp > 28 ? 'warn' : 'good'));
+            updateLed('led-hum', data.sensors.hum > 80 ? 'warn' : 'good');
+            updateLed('led-ppm', data.sensors.mq135 > 150 ? 'warn' : (data.sensors.mq135 > 200 ? 'bad' : 'good'));
+        }
 
-        // =============================================================
-        // 6. 統一的衛生紙邏輯 (使用 hardwareData，確保不論切換到哪都看得到同一套數據)
-        // =============================================================
+        // 6. 統一的衛生紙與洗手液邏輯
         if (hardwareData && hardwareData.sensors) {
           const dist = hardwareData.sensors.dist;
           const paperText = document.getElementById('val-paper');
@@ -472,7 +471,6 @@
             updateLed('led-paper', 'good');
           }
 
-          // 7. 統一的洗手液邏輯 (使用 hardwareData)
           const liquidText = document.getElementById('val-liquid');
           if (hardwareData.sensors.liquid === 1) {
             liquidText.innerText = "正常";
@@ -482,7 +480,6 @@
             updateLed('led-liquid', 'bad');
           }
         }
-        // =============================================================
 
         // 8. 同步風扇狀態
         if (data.control && data.control.fan !== undefined) {
@@ -491,8 +488,13 @@
         }
 
       } catch (e) {
-        console.error("連線錯誤:", e);
-        document.getElementById('node-name-display').innerText = "連線失敗 (請檢查 IP)";
+        // ★ 這裡改成更合理的雲端錯誤提示
+        console.error("瞬間連線波動:", e);
+        const nameDisplay = document.getElementById('node-name-display');
+        // 只有當畫面上還沒有名字時，才顯示重新同步中，避免畫面閃爍
+        if(nameDisplay.innerText.includes("連線") || nameDisplay.innerText === "") {
+            nameDisplay.innerText = "重新同步中...";
+        }
       }
     }
         // 在 fetchData 函數之外，或是在腳本最下方加入
