@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BLE Mesh｜傳感器</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-main: #eef2f6; --bg-panel: #ffffff; 
+      --text-main: #1e293b; --text-muted: #64748b;
+      --border-light: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+    }
+
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      min-height: 100vh;
+      max-width: 1440px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.5);
+      box-shadow: 0 0 50px rgba(0,0,0,0.05);
+    }
+
+    /* === Sidebar === */
+    .sidebar {
+      background: #fff;
+      border-right: 1px solid var(--border-light);
+      padding: 32px 24px;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .brand { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
+    .brand-sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 8px; font-weight: 600; }
+
+    .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; }
+    .menu-item {
+      text-decoration: none; color: #475569; display: flex; align-items: center; gap: 12px;
+      font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 12px; transition: all 0.2s ease;
+    }
+    .menu-item:hover { background: #f1f5f9; color: #0f172a; }
+    .menu-item.active { background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
+
+    .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 24px; }
+    .logout { font-size: 18px; font-weight: 700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
+    .logout:hover { background: #fef2f2; }
+
+    .user-profile {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px;
+      background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .user-icon { width: 36px; height: 36px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .user-text { display: flex; flex-direction: column; }
+    .user-name { font-size: 14px; font-weight: 700; color: #0f172a; }
+    .badge-admin { font-size: 10px; background: #0f172a; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-top: 2px; width: fit-content; }
+
+    /* === Main Content === */
+    .main { padding: 32px 40px; }
+    h2 { margin: 0; font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+    h3 { margin: 32px 0 16px; font-size: 20px; font-weight: 700; color: #334155; }
+    .muted { color: var(--text-muted); font-size: 14px; margin-top: 4px; font-weight: 500; }
+
+    .row-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 16px; }
+    
+    .card {
+      background: #fff;
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+      transition: transform 0.2s ease;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    
+    .card-label { font-size: 14px; color: #64748b; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
+    .card-value { font-size: 28px; font-weight: 700; color: #0f172a; }
+    .card-unit { font-size: 14px; color: #94a3b8; margin-left: 4px; }
+    .card-status { font-size: 14px; font-weight: 700; margin-top: 8px; }
+
+    /* 按鈕樣式 */
+    .btn-ctrl { 
+        padding: 12px 24px; border: 1px solid #cbd5e1; border-radius: 12px; 
+        background: #fff; cursor: pointer; transition: all 0.2s ease; 
+        font-weight: 700; color: #334155; font-size: 16px;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        width: 100%;
+    }
+    .btn-ctrl:active { transform: translateY(1px); }
+    .btn-ctrl.on { border-color: #10b981; color: #059669; background: #ecfdf5; }
+    .btn-ctrl.off { border-color: #ef4444; color: #dc2626; background: #fef2f2; }
+    
+    @media (max-width: 900px) {
+      .dashboard-layout { grid-template-columns: 1fr; margin: 0; box-shadow: none; border-radius: 0; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border-light); flex-direction: row; align-items: center; padding: 16px; }
+      .brand { font-size: 24px; } .brand-sub, .logout-divider, .logout { display: none; }
+      .menu { flex-direction: row; margin-top: 0; } .menu-item { padding: 8px 12px; font-size: 14px; }
+      .main { padding: 24px; } .row-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="dashboard-layout">
+    <aside class="sidebar">
+      <div>
+        <div><div class="brand">BLE Mesh</div><div class="brand-sub">smart restroom monitor</div></div>
+        <div class="menu">
+          <a class="menu-item" href="./select_node.html">主畫面</a>
+          <a class="menu-item" href="./index.html">即時狀況</a>
+          <a class="menu-item active" href="./sensors.html">感測器</a>
+          <a class="menu-item" href="./history.html">歷史紀錄</a>
+          <a class="menu-item" href="./realtime_status.html">占用偵測</a>
+        </div>
+      </div>
+      <div>
+        <div class="logout-divider"></div>
+        <div class="logout">登出</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <h2>感測器頁面</h2>
+      <div class="muted">Node: <span id="node-display">mesh-01</span> ・最後更新：<span id="ts-display">--</span></div>
+
+      <h3>即時數據</h3>
+      <div class="row-grid" id="sensor-cards">
+         </div>
+
+      <h3>手動控制</h3>
+      <div class="row-grid" id="actuator-cards">
+         </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="app.js"></script>
+  
+  <script>
+    const p = new URLSearchParams(window.location.search);
+    const n = p.get("node_id") || "JETSON_NANO_01";
+    document.getElementById("node-display").textContent = n;
+
+    // ==========================================
+    // ★ 關鍵修改：先畫出介面 (預設為空值)
+    // ==========================================
+    
+    // 1. 馬上執行一次渲染 (傳入空物件 {}，這樣會顯示 "--")
+    renderSensors({}); 
+    renderActuators({});
+
+    // 2. 然後才開始嘗試抓資料
+    loadData();
+    setInterval(loadData, 3000);
+
+    async function loadData() {
+        try {
+            const res = await fetch(`${API_BASE}/api/latest?node_id=${n}`);
+            if(!res.ok) throw new Error("API Error");
+            const data = await res.json();
+            
+            // 資料來了，更新畫面上的數字
+            if(data.ts) {
+                document.getElementById("ts-display").textContent = new Date(data.ts).toLocaleTimeString();
+            }
+            renderSensors(data.sensors || {});
+            renderActuators(data.control || {});
+
+        } catch(e) { 
+            // 如果連線失敗，這裡什麼都不做，保留原本的介面 (或是顯示上次的數值)
+            // 不會讓畫面變白
+            console.log("Waiting for connection...");
+        }
+    }
+
+    function renderSensors(s) {
+        const container = document.getElementById("sensor-cards");
+        container.innerHTML = ""; 
+
+        // 就算 s 是空的，我們也要畫出這 5 張卡片
+        const items = [
+            { key: 'temp', label: '溫度', unit: '°C' },
+            { key: 'hum', label: '濕度', unit: '%' },
+            { key: 'mq135', label: '空氣品質 (MQ)', unit: 'ppm' },
+            { key: 'liquid', label: '洗手液', unit: '' },
+            { key: 'dist', label: '衛生紙 (距離)', unit: 'cm' }
+        ];
+
+        items.forEach(item => {
+            // 如果沒資料，就是 "--"
+            let val = s[item.key] !== undefined ? s[item.key] : "--";
+            let statusHtml = "<span style='color:#94a3b8'>● 等待連線</span>";
+
+            // 只有當 val 不是 "--" 時才判斷狀態
+            if (val !== "--") {
+                if (item.key === 'liquid') {
+                    if(val === 1) { val = "充足"; statusHtml = "<span style='color:#059669'>● 狀態良好</span>"; }
+                    else { val = "不足"; statusHtml = "<span style='color:#ef4444'>● 需補充</span>"; }
+                }
+                else if (item.key === 'dist') {
+                     if(val > 15) statusHtml = "<span style='color:#ef4444'>● 已用盡</span>";
+                     else if(val >= 12) statusHtml = "<span style='color:#d97706'>● 即將用盡</span>";
+                     else statusHtml = "<span style='color:#059669'>● 充足</span>";
+                } else {
+                    statusHtml = "<span style='color:#059669'>● 監測中</span>";
+                }
+            }
+
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+                <div class="card-label">${item.label}</div>
+                <div>
+                    <span class="card-value">${val}</span>
+                    <span class="card-unit">${item.key === 'liquid' ? '' : item.unit}</span>
+                </div>
+                <div class="card-status">${statusHtml}</div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function renderActuators(ctrl) {
+        const container = document.getElementById("actuator-cards");
+        container.innerHTML = "";
+
+        // 就算沒資料，預設當作關閉
+        const isFanOn = ctrl.fan === true;
+        const btn = document.createElement("button");
+        btn.className = `btn-ctrl ${isFanOn ? 'on' : 'off'}`;
+        btn.innerHTML = isFanOn ? "💨 排風扇：開啟中" : "💨 排風扇：已關閉";
+        
+        btn.onclick = () => toggleFan(isFanOn);
+        container.appendChild(btn);
+    }
+
+    async function toggleFan(currentState) {
+        const btn = document.querySelector(".btn-ctrl");
+        if(btn) btn.textContent = "發送指令中...";
+        
+        const action = currentState ? "fan_off" : "fan_on";
+        try {
+            await fetch(`${API_BASE}/api/control`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ node_id: n, action: action })
+            });
+            // 稍等一下再更新，讓使用者感覺有反應
+            setTimeout(loadData, 500);
+        } catch(e) {
+            alert("目前無法連接到設備");
+            // 失敗後重繪介面回原本狀態
+            loadData();
+        }
+    }
+  </script>
+</body>
+</html>

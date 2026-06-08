@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BLE Mesh｜歷史紀錄</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+  <style>
+    :root {
+      --bg-main: #eef2f6; --bg-panel: #ffffff; 
+      --text-main: #1e293b; --text-muted: #64748b;
+      --border-light: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+    }
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      min-height: 100vh;
+      max-width: 1440px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.5);
+      box-shadow: 0 0 50px rgba(0,0,0,0.05);
+    }
+    
+    /* === Sidebar (完全還原樣式) === */
+    .sidebar {
+      background: #fff;
+      border-right: 1px solid var(--border-light);
+      padding: 32px 24px;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .brand { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
+    .brand-sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 8px; font-weight: 600; }
+
+    .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; }
+    .menu-item {
+      text-decoration: none; color: #475569; display: flex; align-items: center; gap: 12px;
+      font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 12px; transition: all 0.2s ease;
+    }
+    .menu-item:hover { background: #f1f5f9; color: #0f172a; }
+    .menu-item.active { background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
+
+    /* 修復：這裡加回了 sidebar-footer class，讓 app.js 能正確插入帳號 */
+    .sidebar-footer { margin-top: auto; }
+    .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 24px; }
+    .logout { font-size: 18px; font-weight: 700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
+    .logout:hover { background: #fef2f2; }
+
+    /* 使用者資訊樣式 (配合 app.js) */
+    .user-profile {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px;
+      background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .user-icon { width: 36px; height: 36px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .user-text { display: flex; flex-direction: column; }
+    .user-name { font-size: 14px; font-weight: 700; color: #0f172a; }
+    .badge-admin { font-size: 10px; background: #0f172a; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-top: 2px; width: fit-content; }
+
+    /* === Main Content === */
+    .main { padding: 32px 40px; }
+    h2 { margin: 0; font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+    .muted { color: var(--text-muted); font-size: 14px; margin-top: 4px; font-weight: 500; }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+      margin-top: 12px;
+    }
+    select {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 16px;
+      margin-right: 15px;
+      background-color: #f8fafc;
+      color: #334155;
+      font-weight: 600;
+    }
+    .history-chart-card {
+      height: 400px;
+      display: flex;
+      flex-direction: column;
+      position: relative; 
+    }
+    .history-chart-card canvas {
+      flex: 1;
+      max-height: 340px; 
+      width: 100% !important;
+    }
+    #chart-note { margin-top: 6px; font-size: 12px; color: var(--text-muted); white-space: nowrap; text-align: right; }
+    
+    #reset-zoom-btn {
+      position: absolute;
+      top: 16px; right: 16px; z-index: 10;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px; font-weight: 600; color: #475569;
+      cursor: pointer;
+      display: none;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    #reset-zoom-btn:hover { background: #f1f5f9; color: #0f172a; }
+
+    @media (max-width: 900px) {
+      .dashboard-layout { grid-template-columns: 1fr; margin: 0; box-shadow: none; border-radius: 0; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border-light); flex-direction: row; align-items: center; padding: 16px; }
+      .brand { font-size: 24px; } .brand-sub, .logout-divider, .logout { display: none; }
+      .menu { flex-direction: row; margin-top: 0; } .menu-item { padding: 8px 12px; font-size: 14px; }
+      .main { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">BLE Mesh</div>
+        <div class="brand-sub">smart restroom monitor</div>
+        <div class="menu">
+          <a class="menu-item" href="./select_node.html">主畫面</a>
+          <a class="menu-item" href="./index.html">即時狀況</a>
+          <a class="menu-item" href="./sensors.html">感測器</a>
+          <a class="menu-item active" href="./history.html">歷史紀錄</a>
+          <a class="menu-item" href="./realtime_status.html">占用偵測</a>
+        </div>
+      </div>
+      
+      <div class="sidebar-footer">
+        <div class="logout-divider"></div>
+        <div class="logout">登出</div>
+      </div>
+    </aside>
+    
+    <main class="main">
+      <h2>歷史資料庫</h2>
+      <div class="muted">查看感測器最近的詳細數據 (<span id="node-id-display">載入中...</span>)</div>
+      
+      <h3>篩選條件</h3>
+      <div class="card">
+        <label>感測器：
+          <select id="sensor-select">
+             <option value="temp">溫度</option>
+             <option value="hum">濕度</option>
+             <option value="mq135">空氣品質 (MQ)</option>
+             <option value="dist">衛生紙距離</option>
+          </select>
+        </label>
+        <label>時間範圍：
+          <select id="range-select">
+            <option value="30">最近 30 分鐘</option>
+            <option value="60" selected>最近 1 小時</option>
+            <option value="180">最近 3 小時</option>
+            <option value="1440">最近 24 小時</option>
+          </select>
+        </label>
+      </div>
+
+      <h3 id="table-title">折線圖</h3>
+      <div class="card history-chart-card">
+        <button id="reset-zoom-btn">⟲ 重置縮放</button>
+        <canvas id="history-chart"></canvas>
+        <div class="muted" id="chart-note">提示：您可以使用滾輪縮放圖表，或拖曳平移</div>
+      </div>
+    </main>
+  </div>
+  
+  <script src="./app.js"></script>
+  
+  <script>
+    // ==========================================
+    // ★ 1. 頁面初始化與標題更新 (優先執行)
+    // ==========================================
+    (function initPage() {
+        const p = new URLSearchParams(window.location.search);
+        
+        // 智慧 ID 判斷：網址 > 記憶 > 預設
+        const NODE_ID = p.get("node_id") || localStorage.getItem("selectedNode") || "JETSON_NANO_01";
+        
+        // 存回記憶
+        localStorage.setItem("selectedNode", NODE_ID);
+
+        // 名稱對照
+        const nameMap = { "JETSON_NANO_01": "廁所 01 (男)", "JETSON_NANO_02": "廁所 02 (女)" };
+        const displayName = nameMap[NODE_ID] || NODE_ID;
+        
+        // 更新標題
+        const displayEl = document.getElementById("node-id-display");
+        if(displayEl) displayEl.textContent = displayName;
+
+        // 側邊欄連結修復
+        document.querySelectorAll(".menu-item").forEach(link => {
+            const href = link.getAttribute("href");
+            if (href && !href.includes("select_node.html")) {
+                const separator = href.includes("?") ? "&" : "?";
+                link.setAttribute("href", `${href}${separator}node_id=${NODE_ID}`);
+            }
+        });
+
+        // 啟動圖表
+        setupChart(NODE_ID);
+    })();
+
+    // ==========================================
+    // ★ 2. 圖表功能
+    // ==========================================
+    function setupChart(nodeId) {
+        let myChart = null;
+        const sensorSelect = document.getElementById("sensor-select");
+        const rangeSelect = document.getElementById("range-select");
+        const zoomBtn = document.getElementById("reset-zoom-btn");
+
+        sensorSelect.addEventListener("change", () => loadData(nodeId));
+        rangeSelect.addEventListener("change", () => loadData(nodeId));
+        zoomBtn.addEventListener("click", () => {
+            if(myChart) myChart.resetZoom();
+            zoomBtn.style.display = 'none';
+        });
+
+        async function loadData(targetNodeId) {
+            const sensor = sensorSelect.value;
+            const mins = rangeSelect.value;
+            const ctx = document.getElementById('history-chart').getContext('2d');
+
+            try {
+                // 防呆：如果 API_BASE 未定義則用空字串
+                const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "";
+                
+                const res = await fetch(`${apiBase}/api/history?node_id=${targetNodeId}&sensor=${sensor}&minutes=${mins}`);
+                if(!res.ok) throw new Error("API Error");
+                const data = await res.json();
+                
+                const records = data.values || [];
+                const plotData = records.map(r => ({ x: new Date(r.ts), y: r.value }));
+
+                if(myChart) myChart.destroy();
+
+                myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: sensor.toUpperCase(),
+                            data: plotData,
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,       
+                            pointHoverRadius: 6,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: {
+                            x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, grid: { color: '#f1f5f9' } },
+                            y: { grid: { color: '#f1f5f9' }, beginAtZero: false }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            zoom: {
+                                zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x', onZoom: () => { zoomBtn.style.display = 'block'; } },
+                                pan: { enabled: true, mode: 'x' }
+                            }
+                        }
+                    }
+                });
+            } catch(e) { console.error("Chart Error:", e); }
+        }
+        loadData(nodeId);
+    }
+  </script>
+</body>
+</html>

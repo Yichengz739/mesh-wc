@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>BLE Mesh | 系統登入</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* 保持原樣式 */
+    :root { --bg-main: #eef2f6; --bg-panel: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --primary: #0f172a; }
+    body { margin: 0; font-family: 'Segoe UI', system-ui; background: var(--bg-main); display: flex; align-items: center; justify-content: center; height: 100vh; }
+    .auth-card { background: var(--bg-panel); width: 100%; max-width: 400px; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); text-align: center; }
+    .brand { font-size: 32px; font-weight: 800; color: var(--primary); }
+    .form-group { margin-bottom: 20px; text-align: left; }
+    label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+    input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; box-sizing: border-box; }
+    .btn-login { width: 100%; padding: 14px; border: none; border-radius: 10px; background: var(--primary); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; user-select: none; }
+    .error-msg { color: #ef4444; font-size: 14px; margin-bottom: 16px; display: none; }
+    a { color: var(--primary); text-decoration: none; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <div class="brand">BLE Mesh</div>
+    <div style="margin-bottom: 30px; color: #64748b; font-size: 12px; font-weight: 700; letter-spacing: 1px;">SYSTEM LOGIN</div>
+    
+    <div id="error-box" class="error-msg"></div>
+
+    <form id="loginForm" novalidate>
+      <div class="form-group">
+        <label>帳號</label>
+        <input type="text" id="username" required placeholder="請輸入帳號" />
+      </div>
+      <div class="form-group">
+        <label>密碼</label>
+        <input type="password" id="password" required placeholder="請輸入密碼" />
+      </div>
+      <button type="submit" class="btn-login">登入系統</button>
+    </form>
+    <div style="margin-top: 24px; font-size: 14px;">還沒有帳號？ <a href="register.html">立即註冊</a></div>
+  </div>
+
+  <script>
+    const API_BASE = "http://192.168.0.121:8080"; // 自動抓取當前網址
+
+    // --- 密技邏輯 ---
+    const loginBtn = document.querySelector('.btn-login');
+    let secretCount = 0;
+    let secretTimer = null;
+
+    loginBtn.addEventListener('click', (e) => {
+      secretCount++;
+      if (secretCount === 1) {
+        secretTimer = setTimeout(() => { secretCount = 0; }, 800);
+      }
+      if (secretCount === 3) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        clearTimeout(secretTimer); secretCount = 0;
+        if(confirm("⚡ 觸發管理者捷徑\n是否以 SuperAdmin 身分強行登入？")) {
+            localStorage.setItem("isLoggedIn", "true");
+            localStorage.setItem("username", "SuperAdmin");
+            localStorage.setItem("role", "admin");
+            location.href = "index.html";
+        }
+      }
+    });
+
+    // --- 標準登入 ---
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const u = document.getElementById("username").value;
+      const p = document.getElementById("password").value;
+      const errBox = document.getElementById("error-box");
+      const btn = document.querySelector(".btn-login");
+
+      if (!u || !p) { errBox.textContent = "❌ 請輸入帳號與密碼"; errBox.style.display = "block"; return; }
+
+      btn.textContent = "驗證中...";
+      errBox.style.display = "none";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/login`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+
+        if (data.ok) { // 配合 app.py 的 {"ok": true}
+          localStorage.setItem("isLoggedIn", "true");
+          localStorage.setItem("username", data.username || u);
+          localStorage.setItem("role", data.role || "user");
+          location.href = "index.html"; 
+        } else {
+          errBox.textContent = "❌ " + (data.error || "登入失敗");
+          errBox.style.display = "block";
+        }
+      } catch (err) {
+        errBox.textContent = "❌ 無法連接伺服器";
+        errBox.style.display = "block";
+      } finally {
+        setTimeout(() => { btn.textContent = "登入系統"; }, 500);
+      }
+    });
+  </script>
+</body>
+</html>

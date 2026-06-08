@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>BLE Mesh 智慧廁所環境監控</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg-main: #eef2f6;
+      --bg-panel: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-light: #e2e8f0;
+     
+      /* 基礎色調 */
+      --c-good: #10b981;
+      --c-warn: #f59e0b;
+      --c-bad:  #ef4444;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+    }
+
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      min-height: 100vh;
+      max-width: 1440px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.5);
+      box-shadow: 0 0 50px rgba(0,0,0,0.05);
+    }
+
+    /* === Sidebar === */
+    .sidebar {
+      background: #fff;
+      border-right: 1px solid var(--border-light);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+    .brand { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
+    .brand-sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 8px; font-weight: 600; }
+
+    .user-profile {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px;
+      background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .user-icon { width: 36px; height: 36px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .user-text { display: flex; flex-direction: column; }
+    .user-name { font-size: 14px; font-weight: 700; color: #0f172a; }
+    .badge-admin { font-size: 10px; background: #0f172a; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-top: 2px; width: fit-content; }
+    .logout-divider { border-top: 1px solid #e2e8f0; margin-bottom: 24px; }
+
+    .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; }
+    /* 修改選單文字大小與間距，使其與 sensors.html 一致 */
+    .menu-item {
+      text-decoration: none; 
+      color: #475569; 
+      display: flex; 
+      align-items: center; 
+      gap: 12px;
+      font-size: 18px; /* 從 16px 改為 18px */
+      font-weight: 600; 
+      padding: 12px 16px; 
+      border-radius: 12px; 
+      transition: all 0.2s ease;
+    }
+
+    /* 確保側邊欄在不同頁面高度一致 */
+    .sidebar {
+      background: #fff;
+      border-right: 1px solid var(--border-light);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    /* 響應式手機版選單同步修改 */
+    @media (max-width: 900px) {
+      .dashboard-layout { grid-template-columns: 1fr; }
+      .sidebar { 
+        display: flex; 
+        height: auto; 
+        position: relative; 
+        flex-direction: row; 
+        align-items: center; 
+        padding: 16px; 
+        border-right: none;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .brand-sub, .logout-divider, .logout { display: none; }
+      .menu { flex-direction: row; margin-top: 0; gap: 4px; }
+      .menu-item { padding: 8px 12px; font-size: 14px; }
+      .main-area { grid-template-columns: 1fr; padding: 20px; }
+    }
+    .menu-item:hover { background: #f1f5f9; color: #0f172a; }
+    .menu-item.active { background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
+
+    .sidebar-footer { margin-top: auto; }
+    .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 24px; }
+    .logout { font-size: 16px; font-weight: 700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
+    .logout:hover { background: #fef2f2; }
+
+    /* === Main Layout === */
+    .main-area {
+      background: transparent;
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 24px;
+      padding: 32px 40px;
+    }
+
+    .left-panel, .right-panel { padding: 0; }
+    .right-panel-inner { display: flex; flex-direction: column; gap: 24px; height: 100%; }
+
+    /* === Cards === */
+    .sensors-card, .env-card, .realtime-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+      border: 1px solid var(--border-light);
+      margin-bottom: 24px;
+    }
+    /* 新增這段以覆蓋 .env-card 的排列方式 */
+      .env-card {
+      display: flex;
+      flex-direction: column;
+      height: 568px; /* ★ 修改這裡：直接填寫你想要的高度數值 */
+      
+      margin-top: -10px; /* ★ 新增：如果你覺得框框太低，可以用負數把它往上拉；如果是正數則會往下推 */
+      }
+
+    /* 左側：設備狀態 */
+    .status-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .status-title { font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: 0.02em; }
+    .status-subtext { font-size: 13px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+   
+    .status-legend { display: flex; align-items: center; gap: 16px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+
+    /* === 寶石質感燈號 === */
+    .circle, .sensor-circle {
+      border-radius: 50%;
+      position: relative;
+      border: 1px solid rgba(0,0,0,0.1);
+      background-image: linear-gradient(135deg, var(--bg-top, #e2e8f0), var(--bg-bot, #cbd5e1));
+      box-shadow:
+        inset 0 2px 4px rgba(255,255,255,0.5),
+        inset 0 -2px 4px rgba(0,0,0,0.2),      
+        0 4px 8px rgba(0,0,0,0.15);            
+      transition: all 0.3s ease;
+    }
+
+    .circle { width: 16px; height: 16px; }
+    .sensor-circle { width: 32px; height: 32px; }
+
+    /* 燈號狀態 */
+    .good { --bg-top: #34d399; --bg-bot: #059669; }
+    .warn { --bg-top: #fbbf24; --bg-bot: #d97706; }
+    .bad { --bg-top: #f87171; --bg-bot: #b91c1c; }
+
+    /* 紅燈呼吸光圈 */
+    .sensor-circle.bad::after {
+      content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px;
+      border-radius: 50%; z-index: -1; animation: pulse-ring 2s infinite;
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); opacity: 1; }
+      100% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); opacity: 0; }
+    }
+
+    .sensor-row {
+      display: grid; grid-template-columns: 1fr 100px 100px; align-items: center;
+      padding: 20px 0; border-bottom: 1px solid #f1f5f9;
+    }
+    .sensor-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .sensor-label { font-size: 16px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 8px;}
+    .sensor-indicator { display: flex; justify-content: center; }
+    .sensor-value { font-size: 18px; font-weight: 600; color: #0f172a; text-align: right; }
+
+    /* 右側：環境指數 */
+    .env-title { font-size: 24px; font-weight: 800; color: #0f172a; line-height: 1.2; text-align: center; }
+    .env-sub-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 16px; text-align: center; }
+   
+    .env-content-row { 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; /* ★ 新增：讓圓環垂直置中 */
+    margin: 20px 0; 
+    flex: 1; /* ★ 新增：讓這個區塊自動撐開佔據中間的空間 */
+    }
+    .env-pill {
+      width: 140px; height: 140px; border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #fff 0%, #f1f5f9 100%);
+      border: 4px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      transition: border-color 0.3s;
+    }
+    .env-pill-value { font-size: 48px; font-weight: 800; line-height: 1; color: #0f172a; }
+    .env-pill-unit { font-size: 14px; color: var(--text-muted); font-weight: 600; margin-top: 5px; }
+
+    .env-updatetime { margin-top: 16px; font-size: 12px; color: #94a3b8; text-align: center; }
+
+    /* 風扇按鈕 */
+    .btn-fan {
+     width: 100%; 
+     padding: 12px; 
+    margin-top: auto; /* ★ 修改這裡：將 20px 改為 auto，把按鈕推到最底 */
+    border-radius: 12px; 
+    border: none; 
+    cursor: pointer;
+    background: #f1f5f9; 
+    color: #64748b; 
+    font-weight: 700; 
+    font-size: 14px;
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 8px; 
+    transition: 0.2s;
+    }
+    .btn-fan:hover { background: #e2e8f0; }
+    .btn-fan.active { background: #dbeafe; color: #2563eb; }
+
+    /* === 即時狀況 === */
+    .realtime-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .realtime-title { font-size: 20px; font-weight: 700; color: #0f172a; }
+   
+    .realtime-box { margin-top: 0; max-height: 300px; overflow-y: auto; padding-right: 4px; }
+    .rt-item { padding: 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 8px; display: flex; align-items: center; gap: 12px;}
+   
+    .rt-tag {
+      padding: 4px 10px; border-radius: 6px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; color: #fff;
+      min-width: 60px; text-align: center;
+    }
+    .tag-good { background: var(--c-good); }
+    .tag-warn { background: var(--c-warn); }
+    .tag-bad { background: var(--c-bad); }
+
+    .rt-text { font-size: 14px; color: #334155; font-weight: 500; }
+
+    @media (max-width: 900px) {
+      .dashboard-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main-area { grid-template-columns: 1fr; padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <aside class="sidebar">
+  <div>
+    <div style="margin-bottom: 30px;">
+      <div class="brand">BLE Mesh</div>
+      <div class="brand-sub">smart restroom monitor</div>
+    </div>
+    <div class="menu">
+      <a class="menu-item" href="./select_node.html">主畫面</a>
+      <a class="menu-item active" href="./index.html">即時狀況</a>
+      <a class="menu-item" id="link-sensors" href="./sensors.html">感測器數據</a>
+      <a class="menu-item" href="./history.html">歷史紀錄</a>
+      <a class="menu-item" href="./realtime_status.html">占用偵測</a>
+    </div>
+  </div>
+  <div>
+    <div class="logout-divider"></div>
+    <div class="logout">登出</div>
+  </div>
+</aside>
+
+    <main class="main-area">
+     
+      <section class="left-panel">
+        <div class="status-header">
+          <div>
+            <div class="status-title">設備狀態</div>
+            <div class="status-subtext" id="node-name-display">連線中...</div>
+          </div>
+          <div class="status-legend">
+            <div class="legend-item"><div class="circle good"></div><span>正常</span></div>
+            <div class="legend-item"><div class="circle warn"></div><span>注意</span></div>
+            <div class="legend-item"><div class="circle bad"></div><span>異常</span></div>
+          </div>
+        </div>
+
+        <div class="sensors-card">
+          <div class="sensor-row">
+            <div class="sensor-label">🌡️ 環境溫度</div>
+            <div class="sensor-indicator"><div id="led-temp" class="sensor-circle"></div></div>
+            <div class="sensor-value"><span id="val-temp">--</span> °C</div>
+          </div>
+         
+          <div class="sensor-row">
+            <div class="sensor-label">💧 環境濕度</div>
+            <div class="sensor-indicator"><div id="led-hum" class="sensor-circle"></div></div>
+            <div class="sensor-value"><span id="val-hum">--</span> %</div>
+          </div>
+
+          <div class="sensor-row">
+            <div class="sensor-label">💨 空氣品質 (MQ135)</div>
+            <div class="sensor-indicator"><div id="led-ppm" class="sensor-circle"></div></div>
+            <div class="sensor-value"><span id="val-ppm">--</span> PPM</div>
+          </div>
+
+          <div class="sensor-row">
+            <div class="sensor-label">🧻 衛生紙存量</div>
+            <div class="sensor-indicator"><div id="led-paper" class="sensor-circle"></div></div>
+            <div class="sensor-value" id="val-paper">--</div>
+          </div>
+
+          <div class="sensor-row">
+            <div class="sensor-label">🧴 洗手液狀態</div>
+            <div class="sensor-indicator"><div id="led-liquid" class="sensor-circle"></div></div>
+            <div class="sensor-value" id="val-liquid">--</div>
+          </div>
+        </div>
+
+        <div class="realtime-card">
+          <div class="realtime-header">
+            <div class="realtime-title">🔔 系統即時通知</div>
+          </div>
+          <div class="realtime-box" id="alerts-list">
+             <div class="rt-item"><span class="rt-text" style="color:#aaa;">等待資料同步中...</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="right-panel">
+        <div class="right-panel-inner">
+
+          <!-- ========================================== -->
+          <!-- [新增] 切換廁所的下拉選單 -->
+          <!-- ========================================== -->
+          <div style="background: #fff; border-radius: 20px; padding: 16px 24px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
+            <label for="node-selector" style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0;">📍 選擇查看的廁所</label>
+            <select id="node-selector" onchange="changeNode()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 600; color: #334155; cursor: pointer; outline: none; min-width: 180px;">
+              <!-- 這裡的 value 請對應你 Jetson Nano 實際設定的 node_id -->
+              <option value="JETSON_NANO_01">1樓  (節點 01)</option>
+              <option value="JETSON_NANO_02">1樓  (節點 02)</option>
+              
+            </select>
+          </div>
+          <div class="env-card">
+            <div class="env-title">環境健康指數</div>
+            <div class="env-sub-label">Environmental Health Score</div>
+           
+            <div class="env-content-row">
+              <div class="env-pill" id="score-circle">
+                <div class="env-pill-value" id="env-score">--</div>
+                <div class="env-pill-unit">分</div>
+              </div>
+            </div>
+           
+            <div class="env-updatetime">最後更新：<span id="last-update">--</span></div>
+           
+            
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ==========================================
+    // [設定區] 請修改這裡
+    // ==========================================
+    const API_BASE = "https://api.mesh-wc.xyz"; // ★ 換成 Cloudflare 網址
+   const params = new URLSearchParams(window.location.search);
+    const NODE_ID = params.get("node_id") || localStorage.getItem("selectedNode") || "JETSON_NANO_01";
+
+    // API 網址 (已全面換成雲端網址)
+    const API_URL = `${API_BASE}/api/latest?node_id=${NODE_ID}`;
+    const CTRL_URL = `${API_BASE}/api/control`;
+
+    // 狀態變數
+    let fanState = false;
+
+    // 啟動自動更新
+    setInterval(() => {
+      fetchData();       // 更新左側與右側的單一廁所數值
+      fetchAllAlerts();  // 更新下方的全域通知列表
+    }, 2000);
+    
+    fetchData();
+    fetchAllAlerts();
+
+    async function fetchData() {
+      try {
+        // 1. 抓取目前選定節點的資料 (用於溫度、濕度、空氣品質、環境分數)
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error("API 回應異常");
+        const data = await response.json();
+
+        if (data.error) {
+          console.warn("等待資料:", data.error);
+          document.getElementById('node-name-display').innerText = "等待感測器資料...";
+          return;
+        }
+
+        // 2. [關鍵修改] 另外去抓取實體感測器所在的節點資料 (這裡固定為 JETSON_NANO_01)
+        //    如果你的實體感測器是接在 02，請把下方字串改成 JETSON_NANO_02
+        const HARDWARE_NODE = "JETSON_NANO_01"; 
+        let hardwareData = data; // 預設如果剛好是 01，就直接用同一個資料
+        
+        if (NODE_ID !== HARDWARE_NODE) {
+          try {
+            const hwResponse = await fetch(`${API_BASE}/api/latest?node_id=${HARDWARE_NODE}`);
+            if (hwResponse.ok) {
+              hardwareData = await hwResponse.json();
+            }
+          } catch(err) {
+            console.error("無法取得實體感測器節點資料:", err);
+          }
+        }
+
+        // 3. 更新基本資訊 (當前切換的廁所)
+        document.getElementById('node-name-display').innerText = data.area_name;
+        document.getElementById('last-update').innerText = new Date().toLocaleTimeString();
+        document.getElementById('env-score').innerText = data.env_score;
+       
+        // 更新分數顏色環
+        const scoreCircle = document.getElementById('score-circle');
+        if (data.env_score >= 80) scoreCircle.style.borderColor = "var(--c-good)";
+        else if (data.env_score >= 60) scoreCircle.style.borderColor = "var(--c-warn)";
+        else scoreCircle.style.borderColor = "var(--c-bad)";
+
+        // 4. 更新數值 (各自獨立的溫濕度、空氣品質)
+        updateValue('val-temp', data.sensors.temp.toFixed(1));
+        updateValue('val-hum', data.sensors.hum.toFixed(0));
+        updateValue('val-ppm', data.sensors.mq135.toFixed(0));
+
+        // 5. 更新燈號
+        updateLed('led-temp', data.sensors.temp > 30 ? 'bad' : (data.sensors.temp > 28 ? 'warn' : 'good'));
+        updateLed('led-hum', data.sensors.hum > 80 ? 'warn' : 'good');
+        updateLed('led-ppm', data.sensors.mq135 > 150 ? 'warn' : (data.sensors.mq135 > 200 ? 'bad' : 'good'));
+
+        // =============================================================
+        // 6. 統一的衛生紙邏輯 (使用 hardwareData，確保不論切換到哪都看得到同一套數據)
+        // =============================================================
+        if (hardwareData && hardwareData.sensors) {
+          const dist = hardwareData.sensors.dist;
+          const paperText = document.getElementById('val-paper');
+          if (dist > 15) {
+            paperText.innerText = "缺紙!";
+            updateLed('led-paper', 'bad');
+          } else if (dist > 12) {
+            paperText.innerText = "即將用盡";
+            updateLed('led-paper', 'warn');
+          } else {
+            paperText.innerText = "充足";
+            updateLed('led-paper', 'good');
+          }
+
+          // 7. 統一的洗手液邏輯 (使用 hardwareData)
+          const liquidText = document.getElementById('val-liquid');
+          if (hardwareData.sensors.liquid === 1) {
+            liquidText.innerText = "正常";
+            updateLed('led-liquid', 'good');
+          } else {
+            liquidText.innerText = "需補充";
+            updateLed('led-liquid', 'bad');
+          }
+        }
+        // =============================================================
+
+        // 8. 同步風扇狀態
+        if (data.control && data.control.fan !== undefined) {
+           fanState = data.control.fan;
+           updateFanUI();
+        }
+
+      } catch (e) {
+        console.error("連線錯誤:", e);
+        document.getElementById('node-name-display').innerText = "連線失敗 (請檢查 IP)";
+      }
+    }
+        // 在 fetchData 函數之外，或是在腳本最下方加入
+    function syncLinks() {
+        const sensorLink = document.getElementById('link-sensors');
+        if (sensorLink) {
+            // 動態將當前的 NODE_ID 加入連結中
+            sensorLink.href = `./sensors.html?node_id=${NODE_ID}`;
+        }
+    }
+
+    // 頁面載入後執行一次
+    syncLinks();
+
+    // 頁面初始化邏輯 (下拉選單 + 動態生成左下角帳號)
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. 下拉選單處理
+      const selector = document.getElementById("node-selector");
+      if (selector) {
+        selector.value = NODE_ID; 
+      }
+
+      // 2. 側邊欄帳號顯示與登出按鈕生成
+      const logoutBtn = document.querySelector(".logout");
+      if (logoutBtn) {
+          const username = localStorage.getItem("username") || "管理員";
+          const role = localStorage.getItem("role") || "admin";
+          
+          const container = logoutBtn.parentElement;
+          const userDiv = document.createElement("div");
+          userDiv.className = "user-profile";
+          userDiv.innerHTML = `
+            <div class="user-icon">👤</div>
+            <div class="user-text">
+                <div class="user-name">${username}</div>
+                ${role === 'admin' ? '<span class="badge-admin">ADMIN</span>' : ''}
+            </div>`;
+          container.insertBefore(userDiv, logoutBtn);
+          
+          // 綁定登出點擊事件
+          logoutBtn.addEventListener("click", () => {
+              if(confirm("確定要登出系統嗎？")) {
+                  localStorage.setItem("isLoggedIn", "false");
+                  location.href = "login.html";
+              }
+          });
+      }
+    });
+
+    // 2. 當下拉選單發生改變時執行
+    function changeNode() {
+      const selector = document.getElementById("node-selector");
+      const newNodeId = selector.value;
+      
+      // 更新 localStorage，這樣其他頁面也會同步抓到最新選擇的節點
+      localStorage.setItem("selectedNode", newNodeId);
+      
+      // 重新導向當前頁面並帶上新的 node_id 參數
+      window.location.href = `index.html?node_id=${newNodeId}`;
+    }
+
+    function updateValue(id, val) {
+      document.getElementById(id).innerText = val;
+    }
+
+    function updateLed(id, status) {
+      const el = document.getElementById(id);
+      el.className = `sensor-circle ${status}`;
+    }
+
+    // ==========================================
+    // [修改] 抓取並整合所有廁所的警報
+    // ==========================================
+    async function fetchAllAlerts() {
+      const select = document.getElementById("node-selector");
+      if (!select) return;
+      
+      // 動態抓取下拉選單裡面的所有 node_id (例如節點01、節點02)
+      const nodes = Array.from(select.options).map(opt => opt.value);
+      let allAlerts = [];
+      
+      // 平行向後端請求所有廁所的最新資料
+      const fetchPromises = nodes.map(nodeId => 
+        fetch(`${API_BASE}/api/latest?node_id=${nodeId}`)
+          .then(res => res.ok ? res.json() : null)
+          .catch(() => null)
+      );
+
+      const results = await Promise.all(fetchPromises);
+      
+      // 將各個廁所的警報統整到同一個陣列，並標記來源區域
+      results.forEach(data => {
+        if (data && !data.error && data.alerts) {
+          data.alerts.forEach(alert => {
+            allAlerts.push({
+              type: alert.type,
+              msg: alert.msg,
+              areaName: data.area_name // 紀錄是哪間廁所的警報
+            });
+          });
+        }
+      });
+      
+      // 呼叫更新 UI 函數
+      updateAlerts(allAlerts);
+    }
+
+    function updateAlerts(alerts) {
+      const list = document.getElementById('alerts-list');
+      list.innerHTML = "";
+     
+      if (!alerts || alerts.length === 0) {
+        list.innerHTML = '<div class="rt-item"><span class="rt-text" style="color:#aaa;">目前所有區域皆無異常狀況</span></div>';
+        return;
+      }
+
+      alerts.forEach(alert => {
+        const typeClass = alert.type === 'good' ? 'tag-good' : (alert.type === 'warn' ? 'tag-warn' : 'tag-bad');
+        const typeText = alert.type === 'good' ? '通知' : (alert.type === 'warn' ? '警告' : '異常');
+       
+        // 如果有區域名稱，就加在訊息最前面加粗顯示
+        const areaPrefix = alert.areaName ? `<strong style="color:#0f172a;">[${alert.areaName}]</strong> ` : "";
+
+        const html = `
+          <div class="rt-item">
+            <span class="rt-tag ${typeClass}">${typeText}</span>
+            <span class="rt-text">${areaPrefix}${alert.msg}</span>
+          </div>
+        `;
+        list.innerHTML += html;
+      });
+    }
+
+    // 風扇控制功能
+    async function toggleFan() {
+      const action = fanState ? 'fan_off' : 'fan_on';
+     
+      try {
+        const res = await fetch(CTRL_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ node_id: NODE_ID, action: action })
+        });
+       
+        const data = await res.json();
+        if (data.status === 'ok') {
+          fanState = data.fan;
+          updateFanUI();
+        }
+      } catch (e) {
+        alert("無法控制風扇，請檢查連線");
+      }
+    }
+
+    function updateFanUI() {
+      const btn = document.getElementById('btn-fan');
+      const statusText = document.getElementById('fan-status');
+     
+      if (fanState) {
+        btn.classList.add('active');
+        statusText.innerText = "(運轉中)";
+      } else {
+        btn.classList.remove('active');
+        statusText.innerText = "(關閉)";
+      }
+    }
+  </script>
+</body>
+</html>

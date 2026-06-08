@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BLE Mesh｜占用偵測</title>
+
+  <style>
+    /* === 全域設定 === */
+    :root{ 
+      --bg-main:#eef2f6; 
+      --bg-panel:#ffffff; 
+      --text-main:#1e293b; 
+      --text-muted:#64748b;
+      
+      /* 狀態顏色變數 */
+      --c-free: #10b981;    /* 綠色：空閒 */
+      --c-busy: #ef4444;    /* 紅色：使用中 */
+      --c-ooo:  #94a3b8;    /* 灰色：故障 */
+      --c-bg-free: #ecfdf5;
+      --c-bg-busy: #fef2f2;
+      --c-bg-ooo:  #f1f5f9;
+    }
+    
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-main); color:var(--text-main); }
+
+    /* Layout */
+    .dashboard-layout{ display:grid; grid-template-columns: 250px minmax(0, 1fr); min-height:100vh; max-width: 1440px; margin: 0 auto; background: rgba(255,255,255,0.5); box-shadow: 0 0 50px rgba(0,0,0,0.05); }
+    
+    /* Sidebar */
+    .sidebar{ background:#fff; border-right: 1px solid #e2e8f0; padding: 32px 24px; display:flex; flex-direction:column; justify-content:space-between; }
+    .brand{ font-size:32px; font-weight:800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
+    .brand-sub{ font-size:12px; text-transform:uppercase; letter-spacing:0.15em; color:var(--text-muted); margin-top: 8px; font-weight: 600; }
+    
+    .menu{ display:flex; flex-direction:column; gap:8px; margin-top: 40px; }
+    .menu-item{ text-decoration:none; color:#475569; display:flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 12px; transition: all 0.2s ease; }
+    .menu-item:hover{ background: #f1f5f9; color: #0f172a; }
+    .menu-item.active{ background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
+    
+    .logout-divider{ border-top: 1px solid #e2e8f0; margin-bottom: 24px; }
+    .logout{ font-size:18px; font-weight:700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
+    .logout:hover{ background: #fef2f2; }
+    
+    /* Main Content */
+    .main{ padding: 32px 40px; }
+
+    .page-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 24px; }
+    .page-title{ margin:0; font-size:28px; font-weight:800; color: #0f172a; }
+
+    /* 圖例 (Legend) */
+    .legend{ display:flex; gap:16px; align-items:center; font-size:14px; font-weight: 600; color: var(--text-muted); }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.free { background: var(--c-free); box-shadow: 0 0 0 2px var(--c-bg-free); }
+    .dot.busy { background: var(--c-busy); box-shadow: 0 0 0 2px var(--c-bg-busy); }
+    .dot.ooo  { background: var(--c-ooo); box-shadow: 0 0 0 2px var(--c-bg-ooo); }
+
+    /* 區域容器 (兩欄佈局：同時顯示兩間廁所) */
+    .zones-container { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+    /* 卡片風格 */
+    .zone-card {
+      background: #fff; border-radius: 20px; padding: 24px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
+      transition: opacity 0.3s;
+    }
+    
+    .zone-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; 
+      padding-bottom: 12px; border-bottom: 2px solid #f1f5f9;
+    }
+    .zone-title-wrap { display: flex; align-items: center; gap: 10px; }
+    .zone-icon { font-size: 24px; background: #f8fafc; padding: 8px; border-radius: 12px; }
+    .zone-title { font-size: 18px; font-weight: 800; color: #334155; }
+    .node-id-badge { font-size: 11px; font-family: monospace; background: #e2e8f0; padding: 4px 8px; border-radius: 6px; color: #475569;}
+
+    /* 廁所隔間佈局 */
+    .rows-wrap { display: flex; flex-direction: column; gap: 20px; }
+    .row-group { }
+    .row-label { font-size: 13px; color: #94a3b8; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    
+    .boxes { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    /* === 核心樣式：廁所方塊 (Cubicle) === */
+    .cubicle {
+      position: relative; width: 80px; height: 100px; border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+      padding-bottom: 12px; font-weight: 700; font-size: 16px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 2px solid transparent; cursor: default;
+    }
+
+    /* 圖示 */
+    .cubicle::before {
+      content: ''; width: 28px; height: 28px; margin-bottom: auto; margin-top: 15px;
+      background-size: contain; background-repeat: no-repeat; opacity: 0.8;
+    }
+
+    /* 狀態：空閒 */
+    .cubicle.free { background-color: var(--c-bg-free); color: var(--c-free); border-color: #a7f3d0; }
+    .cubicle.free::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7' /%3E%3C/svg%3E");
+    }
+
+    /* 狀態：使用中 */
+    .cubicle.occupied { background-color: var(--c-bg-busy); color: var(--c-busy); border-color: #fecaca; }
+    .cubicle.occupied::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23ef4444' viewBox='0 0 24 24'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E");
+    }
+    .cubicle.occupied { animation: pulse-border 2s infinite; }
+
+    /* 狀態：故障/連線失敗 */
+    .cubicle.ooo {
+      background-color: var(--c-bg-ooo); color: var(--c-ooo); border-color: #e2e8f0;
+      background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.03) 5px, rgba(0,0,0,0.03) 10px);
+    }
+    .cubicle.ooo::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' /%3E%3C/svg%3E");
+    }
+
+    @keyframes pulse-border {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    @media (max-width: 900px){
+      .dashboard-layout{ grid-template-columns: 1fr; }
+      .sidebar{ border-right:none; border-bottom: 1px solid #e2e8f0; padding: 16px; flex-direction: row; align-items: center; }
+      .brand{ font-size: 24px; }
+      .brand-sub, .logout-divider, .logout { display: none; }
+      .menu { flex-direction: row; margin-top: 0; }
+      .menu-item { padding: 8px 12px; font-size: 14px; }
+      .zones-container { grid-template-columns: 1fr; }
+    }
+    /* === 補上與 select_node 一致的帳號圓角卡片與標籤樣式 === */
+    .user-profile {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px;
+      background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .user-icon { width: 36px; height: 36px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .user-text { display: flex; flex-direction: column; }
+    .user-name { font-size: 14px; font-weight: 700; color: #0f172a; }
+    .badge-admin { font-size: 10px; background: #0f172a; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-top: 2px; width: fit-content; }
+  </style>
+</head>
+
+<body>
+  <div class="dashboard-layout">
+    <aside class="sidebar">
+      <div>
+        <div>
+          <div class="brand">BLE Mesh</div>
+          <div class="brand-sub">smart restroom monitor</div>
+        </div>
+        <div class="menu">
+          <a class="menu-item" href="./select_node.html">主畫面</a>
+          <a class="menu-item" href="./index.html">即時狀況</a>
+          <a class="menu-item" href="./sensors.html">感測器</a>
+          <a class="menu-item" href="./history.html">歷史紀錄</a>
+          <a class="menu-item active" href="./realtime_status.html">占用偵測</a>
+        </div>
+      </div>
+      <div>
+        <div class="logout-divider"></div>
+        <div class="logout">登出</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">佔用狀況</h1>
+        </div>
+        
+        <div class="legend">
+          <div class="legend-item"><span class="dot free"></span> 空閒</div>
+          <div class="legend-item"><span class="dot busy"></span> 使用中</div>
+          <div class="legend-item"><span class="dot ooo"></span> 故障/斷線</div>
+        </div>
+      </div>
+
+      <div class="zones-container">
+        
+        <div class="zone-card">
+          <div class="zone-header">
+            <div class="zone-title-wrap">
+                <div class="zone-icon">🚽</div>
+                <div class="zone-title">廁所 01</div>
+            </div>
+            <div class="node-id-badge">JETSON_NANO_01</div>
+          </div>
+          
+          <div class="rows-wrap">
+            <div class="row-group">
+              <div class="row-label">隔間狀態</div>
+              <div class="boxes" id="toilet-01">
+                  <div class="muted" style="font-size:12px">連線中...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="zone-card">
+          <div class="zone-header">
+            <div class="zone-title-wrap">
+                <div class="zone-icon">🚽</div>
+                <div class="zone-title">廁所 02</div>
+            </div>
+            <div class="node-id-badge">JETSON_NANO_02</div>
+          </div>
+          
+          <div class="rows-wrap">
+            <div class="row-group">
+              <div class="row-label">隔間狀態</div>
+              <div class="boxes" id="toilet-02">
+                  <div class="muted" style="font-size:12px">連線中...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+
+  <script>
+    // 取得 Node ID 記憶
+    const p = new URLSearchParams(window.location.search);
+    const n = p.get("node_id") || localStorage.getItem("selectedNode") || "JETSON_NANO_01";
+    
+    // 側邊欄 ID 記憶修復
+    document.querySelectorAll(".menu-item").forEach(link => {
+        const href = link.getAttribute("href");
+        if (href && !href.includes("select_node.html")) {
+            const separator = href.includes("?") ? "&" : "?";
+            link.setAttribute("href", `${href}${separator}node_id=${n}`);
+        }
+    });
+
+    // 啟動循環更新
+    fetchAllOccupancy();
+    setInterval(fetchAllOccupancy, 2000);
+
+    // 專注於單一實體感測器的精準判斷
+    async function fetchAllOccupancy() {
+      // 1. 檢查 廁所 01
+      try {
+        const res1 = await fetch(`${API_BASE}/api/occupancy?node_id=JETSON_NANO_01`); 
+        if (!res1.ok) throw new Error("01 Error");
+        const data1 = await res1.json();
+        
+        console.log("【廁所 01】收到佔用資料:", data1); 
+        
+        let status1 = 2; // 2 代表斷線/未知
+        // 確保有收到真實的感測器陣列資料
+        if (data1 && data1.stalls && data1.stalls.length > 0) {
+            status1 = Number(data1.stalls[0]); // 唯的一一個實體感測器狀態 (0或1)
+        }
+        renderBox("toilet-01", status1, "T1");
+      } catch (e) {
+        renderBox("toilet-01", 2, "T1"); 
+      }
+
+      // 2. 檢查 廁所 02
+      try {
+        const res2 = await fetch(`${API_BASE}/api/occupancy?node_id=JETSON_NANO_02`); 
+        if (!res2.ok) throw new Error("02 Error");
+        const data2 = await res2.json();
+        
+        console.log("【廁所 02】收到佔用資料:", data2);
+        
+        let status2 = 2; // 2 代表斷線/未知
+        if (data2 && data2.stalls && data2.stalls.length > 0) {
+            status2 = Number(data2.stalls[0]); // 唯的一一個實體感測器狀態 (0或1)
+        }
+        renderBox("toilet-02", status2, "T2");
+      } catch (e) {
+        renderBox("toilet-02", 2, "T2"); 
+      }
+    }
+
+    // 唯一的渲染方塊函式 (已整合單一實體感測器邏輯，並移除了下方重複的舊函式)
+    function renderBox(containerId, status, label) {
+        const container = document.getElementById(containerId);
+        if(!container) return;
+
+        container.innerHTML = "";
+        const div = document.createElement("div");
+        
+        let cls = "free";
+        let displayLabel = label;
+
+        if (status === 1) {
+            cls = "occupied";   // 紅色：有人
+        } else if (status === 0) {
+            cls = "free";       // 綠色：空閒
+        } else {
+            cls = "ooo";        // 灰色：斷線/未知
+            displayLabel = "斷線";
+        }
+        
+        div.className = `cubicle ${cls}`;
+        div.textContent = displayLabel;
+        container.appendChild(div);
+    }
+  </script>
+</body>
+</html>
