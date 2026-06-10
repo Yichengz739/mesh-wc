@@ -412,6 +412,46 @@
         return null;
     }
 
+    // 3. 環境異常 + 風扇已開啟通知
+    function buildFanActivatedAlert(nodeId, latestData, areaName) {
+    if (!latestData || latestData.error || !latestData.sensors) return null;
+
+    const sensors = latestData.sensors;
+    const control = latestData.control || {};
+
+    const temp = Number(sensors.temp);
+    const hum = Number(sensors.hum);
+    const mq135 = Number(sensors.mq135);
+
+    const abnormalReasons = [];
+
+    // 這裡的條件要和你的燈號異常邏輯一致
+    if (!isNaN(temp) && temp > 30) {
+        abnormalReasons.push(`溫度過高 ${temp.toFixed(1)}°C`);
+    }
+
+    if (!isNaN(hum) && hum > 80) {
+        abnormalReasons.push(`濕度過高 ${hum.toFixed(0)}%`);
+    }
+
+    if (!isNaN(mq135) && mq135 > 200) {
+        abnormalReasons.push(`空氣品質異常 ${mq135.toFixed(0)} PPM`);
+    }
+
+    const isEnvironmentAbnormal = abnormalReasons.length > 0;
+    const isFanOn = control.fan === true || control.fan === 1;
+
+    if (isEnvironmentAbnormal && isFanOn) {
+        return {
+            type: "good",
+            msg: `環境異常已觸發自動排風，風扇已開啟。原因：${abnormalReasons.join("、")}`,
+            areaName: areaName || nodeId
+        };
+    }
+
+    return null;
+  }
+
     // 保留給其他頁面或外部 app.js 呼叫；index 主要由 fetchAllAlerts 統一渲染
     function sendAlertToUI(type, msg) {
         const list = document.getElementById('alerts-list');
@@ -501,7 +541,7 @@
             // 5. 更新燈號
             updateLed('led-temp', data.sensors.temp > 30 ? 'bad' : (data.sensors.temp > 28 ? 'warn' : 'good'));
             updateLed('led-hum', data.sensors.hum > 80 ? 'warn' : 'good');
-            updateLed('led-ppm', data.sensors.mq135 > 150 ? 'warn' : (data.sensors.mq135 > 200 ? 'bad' : 'good'));
+            updateLed('led-ppm', data.sensors.mq135 > 200 ? 'bad' : (data.sensors.mq135 > 150 ? 'warn' : 'good'));
         }
 
         // 6. 統一的衛生紙與洗手液邏輯
@@ -634,19 +674,25 @@
 
       const latestResults = await Promise.all(latestPromises);
       latestResults.forEach((data, index) => {
-        const nodeId = nodes[index];
-        areaNameMap[nodeId] = data?.area_name || nodeId;
+          const nodeId = nodes[index];
+          areaNameMap[nodeId] = data?.area_name || nodeId;
 
-        if (data && !data.error && Array.isArray(data.alerts)) {
-          data.alerts.forEach(alert => {
-            allAlerts.push({
-              type: alert.type,
-              msg: alert.msg,
-              areaName: areaNameMap[nodeId]
+          if (data && !data.error && Array.isArray(data.alerts)) {
+            data.alerts.forEach(alert => {
+              allAlerts.push({
+                type: alert.type,
+                msg: alert.msg,
+                areaName: areaNameMap[nodeId]
+              });
             });
-          });
-        }
-      });
+          }
+
+          // 新增：溫度、濕度、空氣品質異常，且風扇已開啟時，加入系統即時通知
+          const fanAlert = buildFanActivatedAlert(nodeId, data, areaNameMap[nodeId]);
+          if (fanAlert) {
+            allAlerts.push(fanAlert);
+          }
+        });
 
       // 2. 再抓占用 API，超過 20 秒就加入 index 的「系統即時通知」
       const occupancyPromises = nodes.map(nodeId =>
