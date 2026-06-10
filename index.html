@@ -412,45 +412,41 @@
         return null;
     }
 
-    // 3. 環境異常 + 風扇已開啟通知
+    
+    // 3. 環境異常後，直接顯示風扇已開啟通知
     function buildFanActivatedAlert(nodeId, latestData, areaName) {
-    if (!latestData || latestData.error || !latestData.sensors) return null;
+        if (!latestData || latestData.error || !latestData.sensors) return null;
 
-    const sensors = latestData.sensors;
-    const control = latestData.control || {};
+        const sensors = latestData.sensors;
 
-    const temp = Number(sensors.temp);
-    const hum = Number(sensors.hum);
-    const mq135 = Number(sensors.mq135);
+        const temp = Number(sensors.temp);
+        const hum = Number(sensors.hum);
+        const mq135 = Number(sensors.mq135);
 
-    const abnormalReasons = [];
+        const abnormalReasons = [];
 
-    // 這裡的條件要和你的燈號異常邏輯一致
-    if (!isNaN(temp) && temp > 30) {
-        abnormalReasons.push(`溫度過高 ${temp.toFixed(1)}°C`);
+        if (!isNaN(temp) && temp > 30) {
+            abnormalReasons.push(`溫度過高 ${temp.toFixed(1)}°C`);
+        }
+
+        if (!isNaN(hum) && hum > 80) {
+            abnormalReasons.push(`濕度過高 ${hum.toFixed(0)}%`);
+        }
+
+        if (!isNaN(mq135) && mq135 > 200) {
+            abnormalReasons.push(`空氣品質異常 ${mq135.toFixed(0)} PPM`);
+        }
+
+        if (abnormalReasons.length > 0) {
+            return {
+                type: "good",
+                msg: `環境異常已觸發自動排風，風扇已開啟。原因：${abnormalReasons.join("、")}`,
+                areaName: areaName || nodeId
+            };
+        }
+
+        return null;
     }
-
-    if (!isNaN(hum) && hum > 80) {
-        abnormalReasons.push(`濕度過高 ${hum.toFixed(0)}%`);
-    }
-
-    if (!isNaN(mq135) && mq135 > 200) {
-        abnormalReasons.push(`空氣品質異常 ${mq135.toFixed(0)} PPM`);
-    }
-
-    const isEnvironmentAbnormal = abnormalReasons.length > 0;
-    const isFanOn = control.fan === true || control.fan === 1;
-
-    if (isEnvironmentAbnormal && isFanOn) {
-        return {
-            type: "good",
-            msg: `環境異常已觸發自動排風，風扇已開啟。原因：${abnormalReasons.join("、")}`,
-            areaName: areaName || nodeId
-        };
-    }
-
-    return null;
-  }
 
     // 保留給其他頁面或外部 app.js 呼叫；index 主要由 fetchAllAlerts 統一渲染
     function sendAlertToUI(type, msg) {
@@ -757,17 +753,19 @@
       }
     }
 
-    function updateFanUI() {
-      const btn = document.getElementById('btn-fan');
-      const statusText = document.getElementById('fan-status');
-     
-      if (fanState) {
-        btn.classList.add('active');
-        statusText.innerText = "(運轉中)";
-      } else {
-        btn.classList.remove('active');
-        statusText.innerText = "(關閉)";
-      }
+   function updateFanUI() {
+        const btn = document.getElementById('btn-fan');
+        const statusText = document.getElementById('fan-status');
+
+        if (!btn || !statusText) return;
+
+        if (fanState) {
+            btn.classList.add('active');
+            statusText.innerText = "(運轉中)";
+        } else {
+            btn.classList.remove('active');
+            statusText.innerText = "(關閉)";
+        }
     }
   </script>
 </body>
