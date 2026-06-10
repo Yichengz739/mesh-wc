@@ -382,13 +382,61 @@
   </div>
 
   <script>
+    // 1. 占用超時告警設定
+    const OCCUPANCY_ALERT_MS = 20000; // 20 秒
+    let occupiedStartTimes = {};      // 紀錄每個節點開始占用的時間
+
+    // 2. 占用偵測：回傳可放進「系統即時通知」的 alert 物件
+    function buildOccupancyAlert(nodeId, stallsData, areaName) {
+        const isOccupied = Array.isArray(stallsData) && stallsData.some(state => Number(state) === 1);
+        const now = Date.now();
+
+        if (isOccupied) {
+            if (!occupiedStartTimes[nodeId]) {
+                occupiedStartTimes[nodeId] = now;
+                return null;
+            }
+
+            if (now - occupiedStartTimes[nodeId] >= OCCUPANCY_ALERT_MS) {
+                return {
+                    type: "warn",
+                    msg: "占用偵測：隔間已占用超過 20 秒，請維護人員前往確認。",
+                    areaName: areaName || nodeId
+                };
+            }
+        } else {
+            // 無人使用時重置計時，下一次有人才會重新計算 20 秒
+            occupiedStartTimes[nodeId] = null;
+        }
+
+        return null;
+    }
+
+    // 保留給其他頁面或外部 app.js 呼叫；index 主要由 fetchAllAlerts 統一渲染
+    function sendAlertToUI(type, msg) {
+        const list = document.getElementById('alerts-list');
+        if (!list) return;
+
+        const typeClass = type === 'good' ? 'tag-good' : (type === 'warn' ? 'tag-warn' : 'tag-bad');
+        const typeText = type === 'good' ? '通知' : (type === 'warn' ? '警告' : '異常');
+
+        const html = `
+          <div class="rt-item">
+            <span class="rt-tag ${typeClass}">${typeText}</span>
+            <span class="rt-text">${msg}</span>
+          </div>
+        `;
+        list.innerHTML = html + list.innerHTML; 
+    }
+
+   
     // ==========================================
     // [設定區] 請修改這裡
     // ==========================================
     const API_BASE = "https://api.mesh-wc.xyz"; // ★ 換成 Cloudflare 網址
-   const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.search);
     const NODE_ID = params.get("node_id") || localStorage.getItem("selectedNode") || "JETSON_NANO_01";
-
+ 
     // API 網址 (已全面換成雲端網址)
     const API_URL = `${API_BASE}/api/latest?node_id=${NODE_ID}`;
     const CTRL_URL = `${API_BASE}/api/control`;
@@ -572,33 +620,48 @@
       const select = document.getElementById("node-selector");
       if (!select) return;
       
-      // 動態抓取下拉選單裡面的所有 node_id (例如節點01、節點02)
+      // 動態抓取下拉選單裡面的所有 node_id，例如節點 01、節點 02
       const nodes = Array.from(select.options).map(opt => opt.value);
       let allAlerts = [];
+      const areaNameMap = {};
       
-      // 平行向後端請求所有廁所的最新資料
-      const fetchPromises = nodes.map(nodeId => 
+      // 1. 先抓各節點 latest，保留原本後端 alerts
+      const latestPromises = nodes.map(nodeId => 
         fetch(`${API_BASE}/api/latest?node_id=${nodeId}`)
           .then(res => res.ok ? res.json() : null)
           .catch(() => null)
       );
 
-      const results = await Promise.all(fetchPromises);
-      
-      // 將各個廁所的警報統整到同一個陣列，並標記來源區域
-      results.forEach(data => {
-        if (data && !data.error && data.alerts) {
+      const latestResults = await Promise.all(latestPromises);
+      latestResults.forEach((data, index) => {
+        const nodeId = nodes[index];
+        areaNameMap[nodeId] = data?.area_name || nodeId;
+
+        if (data && !data.error && Array.isArray(data.alerts)) {
           data.alerts.forEach(alert => {
             allAlerts.push({
               type: alert.type,
               msg: alert.msg,
-              areaName: data.area_name // 紀錄是哪間廁所的警報
+              areaName: areaNameMap[nodeId]
             });
           });
         }
       });
+
+      // 2. 再抓占用 API，超過 20 秒就加入 index 的「系統即時通知」
+      const occupancyPromises = nodes.map(nodeId =>
+        fetch(`${API_BASE}/api/occupancy?node_id=${nodeId}`)
+          .then(res => res.ok ? res.json() : null)
+          .catch(() => null)
+      );
+
+      const occupancyResults = await Promise.all(occupancyPromises);
+      occupancyResults.forEach((data, index) => {
+        const nodeId = nodes[index];
+        const occupancyAlert = buildOccupancyAlert(nodeId, data?.stalls, areaNameMap[nodeId]);
+        if (occupancyAlert) allAlerts.push(occupancyAlert);
+      });
       
-      // 呼叫更新 UI 函數
       updateAlerts(allAlerts);
     }
 
@@ -615,7 +678,6 @@
         const typeClass = alert.type === 'good' ? 'tag-good' : (alert.type === 'warn' ? 'tag-warn' : 'tag-bad');
         const typeText = alert.type === 'good' ? '通知' : (alert.type === 'warn' ? '警告' : '異常');
        
-        // 如果有區域名稱，就加在訊息最前面加粗顯示
         const areaPrefix = alert.areaName ? `<strong style="color:#0f172a;">[${alert.areaName}]</strong> ` : "";
 
         const html = `
