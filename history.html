@@ -33,35 +33,34 @@
       box-shadow: 0 0 50px rgba(0,0,0,0.05);
     }
     
-    /* === Sidebar (完全還原樣式) === */
+    /* === 統一的 Sidebar 樣式 (電腦版) === */
     .sidebar {
       background: #fff;
       border-right: 1px solid var(--border-light);
       padding: 32px 24px;
-      display: flex; flex-direction: column; justify-content: space-between;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .brand { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
     .brand-sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 8px; font-weight: 600; }
-
-    .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; }
-    .menu-item {
-      text-decoration: none; color: #475569; display: flex; align-items: center; gap: 12px;
-      font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 12px; transition: all 0.2s ease;
-    }
+    
+    .menu { display: flex; flex-direction: column; gap: 8px; }
+    .menu-item { text-decoration: none; color: #475569; display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 12px; transition: all 0.2s ease; }
     .menu-item:hover { background: #f1f5f9; color: #0f172a; }
     .menu-item.active { background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
 
-    /* 修復：這裡加回了 sidebar-footer class，讓 app.js 能正確插入帳號 */
     .sidebar-footer { margin-top: auto; }
     .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 24px; }
     .logout { font-size: 18px; font-weight: 700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
     .logout:hover { background: #fef2f2; }
 
-    /* 使用者資訊樣式 (配合 app.js) */
-    .user-profile {
-      display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px;
-      background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
-    }
+    /* === 統一的帳號卡片樣式 === */
+    .user-profile { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
     .user-icon { width: 36px; height: 36px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     .user-text { display: flex; flex-direction: column; }
     .user-name { font-size: 14px; font-weight: 700; color: #0f172a; }
@@ -130,13 +129,14 @@
   <div class="dashboard-layout">
     <aside class="sidebar">
       <div>
-        <div class="brand">BLE Mesh</div>
-        <div class="brand-sub">smart restroom monitor</div>
+        <div style="margin-bottom: 40px;">
+          <div class="brand">BLE Mesh</div>
+          <div class="brand-sub">smart restroom monitor</div>
+        </div>
         <div class="menu">
           <a class="menu-item" href="./select_node.html">主畫面</a>
-          <a class="menu-item" href="./index.html">即時狀況</a>
-          <a class="menu-item" href="./sensors.html">感測器</a>
-          <a class="menu-item active" href="./history.html">歷史紀錄</a>
+          <a class="menu-item href" href="./index.html">即時狀況</a>
+          <a class="menu-item active" ="./history.html">歷史紀錄</a>
           <a class="menu-item" href="./realtime_status.html">佔用偵測</a>
         </div>
       </div>
@@ -153,6 +153,13 @@
       
       <h3>篩選條件</h3>
       <div class="card">
+        <label>選擇廁所：
+          <select id="node-selector" onchange="changeNode()">
+            <option value="JETSON_NANO_01">1樓  (節點 01)</option>
+            <option value="JETSON_NANO_02">1樓  (節點 02)</option>
+          </select>
+        </label>
+
         <label>感測器：
           <select id="sensor-select">
              <option value="temp">溫度</option>
@@ -202,6 +209,10 @@
         // 更新標題
         const displayEl = document.getElementById("node-id-display");
         if(displayEl) displayEl.textContent = displayName;
+
+        // ★ 新增：同步下拉選單的值為當前節點
+        const selector = document.getElementById("node-selector");
+        if (selector) selector.value = NODE_ID;
 
         // 側邊欄連結修復
         document.querySelectorAll(".menu-item").forEach(link => {
@@ -283,6 +294,21 @@
             } catch(e) { console.error("Chart Error:", e); }
         }
         loadData(nodeId);
+    }
+    // ==========================================
+    // ★ 3. 切換廁所節點邏輯
+    // ==========================================
+    function changeNode() {
+        const selector = document.getElementById("node-selector");
+        if (!selector) return;
+
+        const newNodeId = selector.value;
+
+        // 存入 localStorage 確保全站同步
+        localStorage.setItem("selectedNode", newNodeId);
+
+        // 重新載入歷史頁面並帶上新的 node_id 參數
+        window.location.href = `history.html?node_id=${newNodeId}`;
     }
   </script>
 </body>

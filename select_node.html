@@ -32,38 +32,38 @@
       overflow: hidden;              /* 移除圓角 border-radius 設定 */
     }
     
-    /* Sidebar 風格統一 */
+    /* === 統一的 Sidebar 樣式 (電腦版) === */
     .sidebar {
       background: #fff;
       border-right: 1px solid var(--border-light);
       padding: 32px 24px;
-      display: flex; flex-direction: column; justify-content: space-between;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .brand { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
     .brand-sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 8px; font-weight: 600; }
-
-    .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; }
-    .menu-item {
-      text-decoration: none; color: #475569; display: flex; align-items: center; gap: 12px;
-      font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 12px; transition: all 0.2s ease;
-    }
+    
+    .menu { display: flex; flex-direction: column; gap: 8px; }
+    .menu-item { text-decoration: none; color: #475569; display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 12px; transition: all 0.2s ease; }
     .menu-item:hover { background: #f1f5f9; color: #0f172a; }
     .menu-item.active { background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
 
+    .sidebar-footer { margin-top: auto; }
     .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 24px; }
     .logout { font-size: 18px; font-weight: 700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
     .logout:hover { background: #fef2f2; }
 
-    /* User Profile 樣式 (配合 app.js) */
-    .user-profile {
-      display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px;
-      background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
-    }
+    /* === 統一的帳號卡片樣式 === */
+    .user-profile { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
     .user-icon { width: 36px; height: 36px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     .user-text { display: flex; flex-direction: column; }
     .user-name { font-size: 14px; font-weight: 700; color: #0f172a; }
     .badge-admin { font-size: 10px; background: #0f172a; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-top: 2px; width: fit-content; }
-
 
     .main { 
       background: transparent; 
@@ -126,19 +126,19 @@
   <div class="dashboard-layout">
     <aside class="sidebar">
       <div>
-        <div>
+        <div style="margin-bottom: 40px;">
           <div class="brand">BLE Mesh</div>
           <div class="brand-sub">smart restroom monitor</div>
         </div>
         <div class="menu">
           <a class="menu-item active" href="./select_node.html">主畫面</a>
-          <a class="menu-item" href="./index.html">即時狀況</a>
-          <a class="menu-item" href="./sensors.html">感測器</a>
+          <a class="menu-item " href="./index.html">即時狀況</a>
           <a class="menu-item" href="./history.html">歷史紀錄</a>
           <a class="menu-item" href="./realtime_status.html">佔用偵測</a>
         </div>
       </div>
-      <div>
+      
+      <div class="sidebar-footer">
         <div class="logout-divider"></div>
         <div class="logout">登出</div>
       </div>
