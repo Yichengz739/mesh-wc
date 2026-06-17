@@ -544,7 +544,7 @@
             updateValue('val-ppm', data.sensors.mq135 ? data.sensors.mq135.toFixed(0) : "--");
 
             // 5. 更新燈號
-            updateLed('led-temp', data.sensors.temp > 30 ? 'bad' : (data.sensors.temp > 28 ? 'warn' : 'good'));
+            updateLed('led-temp', data.sensors.temp > 33 ? 'bad' : (data.sensors.temp > 30 ? 'warn' : 'good'));
             updateLed('led-hum', data.sensors.hum > 80 ? 'warn' : 'good');
             updateLed('led-ppm', data.sensors.mq135 > 200 ? 'bad' : (data.sensors.mq135 > 150 ? 'warn' : 'good'));
         }
