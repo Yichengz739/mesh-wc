@@ -25,14 +25,14 @@
       display: grid;
       grid-template-columns: 250px minmax(0, 1fr) 320px;
       height: 100vh;
-      max-width: 1600px;
+      max-width: 1440px;
       margin: 0 auto;
       background: rgba(255,255,255,0.5);
       box-shadow: 0 0 50px rgba(0,0,0,0.05);
       overflow: hidden;
     }
     
-    /* === 修正後的 Sidebar 樣式 === */
+    /* === 與其他頁面統一的 Sidebar 樣式 === */
     .sidebar {
       background: #fff;
       border-right: 1px solid var(--border-light);
@@ -40,9 +40,10 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      height: 100%;            /* 改為 100% 配合網格容器 */
-      overflow-y: auto;        /* 避免螢幕過矮時內容溢出 */
-      z-index: 10;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .brand { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
     .brand-sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 8px; font-weight: 600; }
@@ -52,8 +53,8 @@
     .menu-item:hover { background: #f1f5f9; color: #0f172a; }
     .menu-item.active { background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
 
-    .sidebar-footer { margin-top: auto; padding-top: 16px; }
-    .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 16px; }
+    .sidebar-footer { margin-top: auto; }
+    .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 24px; }
     .logout { font-size: 18px; font-weight: 700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
     .logout:hover { background: #fef2f2; }
 
@@ -201,7 +202,20 @@
     }
     @media (max-width: 900px){
       .dashboard-layout{ grid-template-columns: 1fr; margin:0; border-radius:0; height: 100vh; }
-      .sidebar{ border-right: none; border-bottom: 3px solid var(--border-light); height: auto; flex-shrink: 0; }
+      .sidebar{
+        border-right: none;
+        border-bottom: 1px solid var(--border-light);
+        height: auto;
+        position: relative;
+        flex-direction: row;
+        align-items: center;
+        padding: 16px;
+        flex-shrink: 0;
+      }
+      .brand { font-size: 24px; }
+      .brand-sub, .logout-divider, .logout { display: none; }
+      .menu { flex-direction: row; margin-top: 0; }
+      .menu-item { padding: 8px 12px; font-size: 14px; }
       .map-card { flex: 1; }
     }
   </style>
@@ -225,13 +239,6 @@
       </div>
       
       <div class="sidebar-footer">
-        <div class="user-profile">
-          <div class="user-icon">👤</div>
-          <div class="user-text">
-            <span class="user-name">管理員</span>
-            <span class="badge-admin">ADMIN</span>
-          </div>
-        </div>
         <div class="logout-divider"></div>
         <div class="logout">登出</div>
       </div>
