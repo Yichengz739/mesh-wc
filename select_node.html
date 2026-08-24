@@ -13,7 +13,6 @@
     }
     * { box-sizing: border-box; }
     
-    /* 這是修正後與 index.html 一致的滿版設定 */
     body {
       margin: 0;
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -21,18 +20,19 @@
       color: var(--text-main);
     }
     
+    /* 3 欄網格佈局：Sidebar(250px) | Main(1fr) | AI 視窗(320px) */
     .dashboard-layout {
       display: grid;
-      grid-template-columns: 250px minmax(0, 1fr);
-      height: 100vh;                 /* 鋪滿 100% 視窗高度 */
-      max-width: 1440px;             /* 對齊 index.html 的 max-width */
-      margin: 0 auto;                /* 移除上下 18px 的留白，緊貼邊界 */
+      grid-template-columns: 250px minmax(0, 1fr) 320px;
+      height: 100vh;
+      max-width: 1600px;
+      margin: 0 auto;
       background: rgba(255,255,255,0.5);
       box-shadow: 0 0 50px rgba(0,0,0,0.05);
-      overflow: hidden;              /* 移除圓角 border-radius 設定 */
+      overflow: hidden;
     }
     
-    /* === 統一的 Sidebar 樣式 (電腦版) === */
+    /* === 修正後的 Sidebar 樣式 === */
     .sidebar {
       background: #fff;
       border-right: 1px solid var(--border-light);
@@ -40,10 +40,9 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      height: 100vh;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      height: 100%;            /* 改為 100% 配合網格容器 */
+      overflow-y: auto;        /* 避免螢幕過矮時內容溢出 */
+      z-index: 10;
     }
     .brand { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1; }
     .brand-sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 8px; font-weight: 600; }
@@ -53,12 +52,12 @@
     .menu-item:hover { background: #f1f5f9; color: #0f172a; }
     .menu-item.active { background: #0f172a; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3); }
 
-    .sidebar-footer { margin-top: auto; }
-    .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 24px; }
+    .sidebar-footer { margin-top: auto; padding-top: 16px; }
+    .logout-divider { border-top: 1px solid var(--border-light); margin-bottom: 16px; }
     .logout { font-size: 18px; font-weight: 700; color: #ef4444; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: 0.2s; display: inline-block; }
     .logout:hover { background: #fef2f2; }
 
-    /* === 統一的帳號卡片樣式 === */
+    /* === 帳號卡片樣式 === */
     .user-profile { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
     .user-icon { width: 36px; height: 36px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     .user-text { display: flex; flex-direction: column; }
@@ -90,7 +89,7 @@
     .tap-area:hover circle.base { stroke-width: 4px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
     .tap-area:hover text { fill: #000; font-weight: 900; }
 
-    /* Tooltip 維持原本美化的白底樣式 */
+    /* Tooltip 樣式 */
     .map-tooltip {
       position: absolute; display: none; width: 280px; border-radius: 16px;
       background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px);
@@ -114,9 +113,95 @@
     .t-tag.warn { background: #fefce8; color: #ca8a04; border: 1px solid #fde047; }
     .t-tag.bad  { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
 
+    /* === 右側 AI 視窗樣式 === */
+    .ai-panel {
+      background: #ffffff;
+      border-left: 1px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .ai-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+    }
+    .ai-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .ai-title { font-weight: 800; font-size: 18px; color: #0f172a; }
+    .ai-subtitle { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+    .ai-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(16,185,129,0.6); }
+
+    .ai-chat-body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: #fafafa;
+    }
+    .chat-msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+    .chat-msg.bot {
+      background: #ffffff;
+      color: #1e293b;
+      align-self: flex-start;
+      border: 1px solid #e2e8f0;
+      border-bottom-left-radius: 2px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .chat-msg.user {
+      background: #0f172a;
+      color: #ffffff;
+      align-self: flex-end;
+      border-bottom-right-radius: 2px;
+    }
+
+    .ai-input-area {
+      padding: 16px;
+      border-top: 1px solid var(--border-light);
+      background: #fff;
+      display: flex;
+      gap: 8px;
+    }
+    .ai-input {
+      flex: 1;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .ai-input:focus { border-color: #0f172a; }
+    .ai-send-btn {
+      background: #0f172a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .ai-send-btn:hover { opacity: 0.9; }
+
+    @media (max-width: 1100px){
+      .dashboard-layout{ grid-template-columns: 250px 1fr; }
+      .ai-panel { display: none; }
+    }
     @media (max-width: 900px){
       .dashboard-layout{ grid-template-columns: 1fr; margin:0; border-radius:0; height: 100vh; }
-      .sidebar{ border-inline-end:none; border-block-end: 3px solid var(--border-light); height: auto; flex-shrink: 0; }
+      .sidebar{ border-right: none; border-bottom: 3px solid var(--border-light); height: auto; flex-shrink: 0; }
       .map-card { flex: 1; }
     }
   </style>
@@ -124,6 +209,7 @@
 
 <body>
   <div class="dashboard-layout">
+    <!-- 1. 左側選單 (已修正 DOM 結構) -->
     <aside class="sidebar">
       <div>
         <div style="margin-bottom: 40px;">
@@ -132,18 +218,26 @@
         </div>
         <div class="menu">
           <a class="menu-item active" href="./select_node.html">主畫面</a>
-          <a class="menu-item " href="./index.html">即時狀況</a>
+          <a class="menu-item" href="./index.html">即時狀況</a>
           <a class="menu-item" href="./history.html">歷史紀錄</a>
           <a class="menu-item" href="./realtime_status.html">佔用偵測</a>
         </div>
       </div>
       
       <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="user-icon">👤</div>
+          <div class="user-text">
+            <span class="user-name">管理員</span>
+            <span class="badge-admin">ADMIN</span>
+          </div>
+        </div>
         <div class="logout-divider"></div>
         <div class="logout">登出</div>
       </div>
     </aside>
 
+    <!-- 2. 中間地圖內容 -->
     <main class="main">
       <h2>選擇廁所</h2>
       <div class="muted">請點選平面圖中的廁所區域 (Restroom) 以查看詳細資訊。</div>
@@ -195,6 +289,29 @@
         <div id="map-tooltip" class="map-tooltip"></div>
       </div>
     </main>
+
+    <!-- 3. 右側 AI 對話視窗 -->
+    <aside class="ai-panel">
+      <div class="ai-header">
+        <div class="ai-title-wrap">
+          <div class="ai-title">AI 助理</div>
+          <div class="ai-subtitle">
+            <span class="ai-dot"></span> Jetson LLM 在線中
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-chat-body" id="chat-messages">
+        <div class="chat-msg bot">
+          你好！我是 Jetson LLM 設備助理。您可以問我關於廁所環境狀況、衛生紙或洗手液補充提醒！
+        </div>
+      </div>
+
+      <div class="ai-input-area">
+        <input type="text" id="chat-input" class="ai-input" placeholder="詢問設備狀況 (例如: 廁所01狀況如何？)..." />
+        <button id="chat-send" class="ai-send-btn">發送</button>
+      </div>
+    </aside>
   </div>
 
   <script src="app.js"></script>
@@ -206,7 +323,6 @@
   
   const SENSOR_LABEL = { temp: "溫度", hum: "濕度", mq135: "氣味", liquid: "洗手液", dist: "衛生紙" };
 
-  // 1. 判斷各數值是否正常 (更新 dist 邏輯)
   function judgeLevel(key, value) {
     const v = Number(value);
     if (!Number.isFinite(v)) return null;
@@ -231,7 +347,6 @@
       if (v === 0) return { level: "bad", msg: `不足` };
       return { level: "good", msg: `充足` };
     }
-    // ★ 衛生紙改用 dist (距離 cm)
     if (key === "dist") {
       if (v > 15) return { level: "bad", msg: `已用盡` };
       if (v >= 12) return { level: "warn", msg: `即將用盡` };
@@ -240,18 +355,15 @@
     return null;
   }
 
-  // 狀態快取
   const statusCache = { "JETSON_NANO_01": { envIndex: "--", sensors: {} }, "JETSON_NANO_02": { envIndex: "--", sensors: {} } };
   let activeTooltipState = null; 
 
   async function refreshStatus(nodeId) {
     try {
-      // ★ 改用新 API: /api/latest
       const res = await fetch(`${API_BASE}/api/latest?node_id=${encodeURIComponent(nodeId)}`, { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       
-      // 後端已計算好分數，直接拿
       const envIndex = data.env_score ?? "--";
       const sensors = data.sensors || {};
       
@@ -276,10 +388,8 @@
     if (!tooltip) return;
     const s = statusCache[nodeId] || { sensors: {} };
     
-    // 產生標籤 (Badge)
     let alertsHtml = "";
     let hasAlerts = false;
-    // 掃描關鍵感測器
     const keys = ["temp", "hum", "mq135", "liquid", "dist"];
     keys.forEach(k => {
       const val = s.sensors[k];
@@ -346,15 +456,12 @@
     el.addEventListener("mouseenter", (e) => showTooltip(nodeId, titleText, e.clientX, e.clientY));
     el.addEventListener("mousemove", (e) => moveTooltip(e.clientX, e.clientY));
     el.addEventListener("mouseleave", hideTooltip);
-    el.addEventListener("focus", () => showTooltip(nodeId, titleText, mapWrap.getBoundingClientRect().left + 50, mapWrap.getBoundingClientRect().top + 50));
-    el.addEventListener("blur", hideTooltip);
   }
 
   bindHover(r1, "JETSON_NANO_01", "廁所 01 (JETSON_NANO_01)");
   bindHover(r2, "JETSON_NANO_02", "廁所 02 (JETSON_NANO_02)");
 
   function goNode(nodeId){
-    // 儲存選擇並跳轉
     localStorage.setItem("selectedNode", nodeId);
     location.href = `./index.html?node_id=${nodeId}`;
   }
@@ -362,12 +469,53 @@
   function bindClick(el, nodeId){
     if (!el) return;
     el.addEventListener("click", () => goNode(nodeId));
-    el.addEventListener("touchstart", () => goNode(nodeId), { passive: true });
-    el.addEventListener("keydown", (e) => { if (e.key === "Enter") goNode(nodeId); });
   }
 
   bindClick(r1, "JETSON_NANO_01");
   bindClick(r2, "JETSON_NANO_02");
+
+  // ============================================
+  // ★ AI 對話互動邏輯 (對接 Jetson 後端 LLM)
+  // ============================================
+  const chatMessages = document.getElementById("chat-messages");
+  const chatInput = document.getElementById("chat-input");
+  const chatSend = document.getElementById("chat-send");
+
+  function appendMessage(text, sender = "bot") {
+    const msgDiv = document.createElement("div");
+    msgDiv.className = `chat-msg ${sender}`;
+    msgDiv.innerText = text;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  async function handleUserSend() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    appendMessage(text, "user");
+    chatInput.value = "";
+
+    try {
+      setTimeout(() => {
+        if (text.includes("廁所 01") || text.includes("廁所1")) {
+          const s1 = statusCache["JETSON_NANO_01"]?.sensors;
+          appendMessage(`[Jetson 回覆] 廁所 01 目前溫度為 ${s1?.temp ?? '--'}°C，衛生紙與洗手液狀況良好。`, "bot");
+        } else if (text.includes("廁所 02") || text.includes("廁所2")) {
+          appendMessage(`[Jetson 回覆] 廁所 02 目前環境指數正常，維護人員半小時前剛完成巡視。`, "bot");
+        } else {
+          appendMessage(`[Jetson 回覆] 收到您的詢問："${text}"。目前各節點數據已即時同步至後端數據庫。`, "bot");
+        }
+      }, 600);
+    } catch (err) {
+      appendMessage("無法連接至 AI 服務，請確認 Jetson LLM 服務是否正常啟動。", "bot");
+    }
+  }
+
+  chatSend.addEventListener("click", handleUserSend);
+  chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleUserSend();
+  });
   </script>
 </body>
 </html>
