@@ -290,6 +290,29 @@
       transition: transform 0.2s ease, opacity 0.2s;
     }
     .ai-send-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+    .ai-send-btn:disabled, .ai-input:disabled { opacity: 0.58; cursor: not-allowed; }
+
+    .chat-msg.loading {
+      color: #64748b;
+      font-style: italic;
+      background: #f8fafc;
+    }
+    .chat-msg.alert {
+      max-width: 100%;
+      background: #fff1f2;
+      color: #9f1239;
+      border: 1px solid #fecdd3;
+      border-left: 4px solid #e11d48;
+      font-weight: 600;
+    }
+    .ai-dot.busy, .ai-rail-status.busy {
+      background: #f59e0b;
+      box-shadow: 0 0 0 4px #fef3c7;
+    }
+    .ai-dot.offline, .ai-rail-status.offline {
+      background: #ef4444;
+      box-shadow: 0 0 0 4px #fee2e2;
+    }
 
     @media (max-width: 1100px){
       .dashboard-layout{ grid-template-columns: 250px minmax(0, 1fr) 56px; }
@@ -401,7 +424,7 @@
         <button id="ai-open" class="ai-rail-button" type="button" aria-label="展開 AI 助理" title="開啟 AI 助理">
           <span class="ai-spark">✦</span>
         </button>
-        <span class="ai-rail-status" title="Jetson LLM 在線中"></span>
+        <span id="ai-rail-status" class="ai-rail-status" title="Jetson LLM 連線狀態"></span>
         <div class="ai-rail-label">AI ASSISTANT</div>
       </div>
 
@@ -410,7 +433,7 @@
           <div class="ai-title-wrap">
             <div class="ai-title">AI 助理</div>
             <div class="ai-subtitle">
-              <span class="ai-dot"></span> Jetson LLM 在線中
+              <span id="ai-status-dot" class="ai-dot"></span><span id="ai-status-text">Jetson LLM 連線確認中...</span>
             </div>
           </div>
           <button id="ai-close" class="ai-collapse-btn" type="button" aria-label="收合 AI 助理" title="收合 AI 助理">›</button>
@@ -591,27 +614,43 @@
   bindClick(r2, "JETSON_NANO_02");
 
   // ============================================
-  // ★ AI 對話互動邏輯 (對接 Jetson 後端 LLM)
+  // ★ AI 對話互動邏輯：正式對接 Jetson Flask LLM API
+  // API contract:
+  // POST /api/llm/query   body: { query: string }
+  // GET  /api/llm/anomaly
   // ============================================
   const dashboardLayout = document.querySelector(".dashboard-layout");
   const aiOpenBtn = document.getElementById("ai-open");
   const aiCloseBtn = document.getElementById("ai-close");
   const aiContent = document.querySelector(".ai-content");
+  const chatMessages = document.getElementById("chat-messages");
+  const chatInput = document.getElementById("chat-input");
+  const chatSend = document.getElementById("chat-send");
+  const aiStatusDot = document.getElementById("ai-status-dot");
+  const aiRailStatus = document.getElementById("ai-rail-status");
+  const aiStatusText = document.getElementById("ai-status-text");
+
+  // 沿用 app.js 既有 API_BASE；若沒有定義，就使用目前網站同源 /api/*。
+  function getApiBase() {
+    if (typeof API_BASE !== "undefined" && API_BASE) {
+      return String(API_BASE).replace(/\/$/, "");
+    }
+    return "";
+  }
 
   function setAiExpanded(expanded) {
     if (!dashboardLayout || !aiContent) return;
     dashboardLayout.classList.toggle("ai-expanded", expanded);
     aiContent.setAttribute("aria-hidden", expanded ? "false" : "true");
     if (expanded) {
-      window.setTimeout(() => document.getElementById("chat-input")?.focus(), 260);
+      window.setTimeout(() => chatInput?.focus(), 260);
     }
   }
 
   aiOpenBtn?.addEventListener("click", () => setAiExpanded(true));
   aiCloseBtn?.addEventListener("click", () => setAiExpanded(false));
-
-  // 預設保持收合；Esc 可快速收回
   setAiExpanded(false);
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && dashboardLayout?.classList.contains("ai-expanded")) {
       setAiExpanded(false);
@@ -619,45 +658,142 @@
     }
   });
 
-  const chatMessages = document.getElementById("chat-messages");
-  const chatInput = document.getElementById("chat-input");
-  const chatSend = document.getElementById("chat-send");
-
-  function appendMessage(text, sender = "bot") {
+  function appendMessage(text, sender = "bot", extraClass = "") {
+    if (!chatMessages) return null;
     const msgDiv = document.createElement("div");
-    msgDiv.className = `chat-msg ${sender}`;
+    msgDiv.className = `chat-msg ${sender}${extraClass ? ` ${extraClass}` : ""}`;
     msgDiv.innerText = text;
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    return msgDiv;
   }
 
-  async function handleUserSend() {
-    const text = chatInput.value.trim();
-    if (!text) return;
+  function setLlmStatus(state, label) {
+    [aiStatusDot, aiRailStatus].forEach((el) => {
+      if (!el) return;
+      el.classList.remove("busy", "offline");
+      if (state === "busy") el.classList.add("busy");
+      if (state === "offline") el.classList.add("offline");
+    });
+    if (aiStatusText) aiStatusText.textContent = label;
+  }
 
-    appendMessage(text, "user");
-    chatInput.value = "";
-
-    try {
-      setTimeout(() => {
-        if (text.includes("廁所 01") || text.includes("廁所1")) {
-          const s1 = statusCache["JETSON_NANO_01"]?.sensors;
-          appendMessage(`[Jetson 回覆] 廁所 01 目前溫度為 ${s1?.temp ?? '--'}°C，衛生紙與洗手液狀況良好。`, "bot");
-        } else if (text.includes("廁所 02") || text.includes("廁所2")) {
-          appendMessage(`[Jetson 回覆] 廁所 02 目前環境指數正常，維護人員半小時前剛完成巡視。`, "bot");
-        } else {
-          appendMessage(`[Jetson 回覆] 收到您的詢問："${text}"。目前各節點數據已即時同步至後端數據庫。`, "bot");
-        }
-      }, 600);
-    } catch (err) {
-      appendMessage("無法連接至 AI 服務，請確認 Jetson LLM 服務是否正常啟動。", "bot");
+  function setChatBusy(isBusy) {
+    if (chatInput) chatInput.disabled = isBusy;
+    if (chatSend) {
+      chatSend.disabled = isBusy;
+      chatSend.textContent = isBusy ? "分析中…" : "發送";
     }
   }
 
-  chatSend.addEventListener("click", handleUserSend);
-  chatInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleUserSend();
+  // 功能一：將管理員自然語言問題送到 Jetson / Flask / LLM
+  async function askJetsonLLM(query) {
+    const response = await fetch(`${getApiBase()}/api/llm/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query })
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (_) {
+      throw new Error(`LLM API 回傳格式錯誤 (HTTP ${response.status})`);
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.message || `LLM API 錯誤 (HTTP ${response.status})`);
+    }
+    return data;
+  }
+
+  async function handleUserSend() {
+    const text = chatInput?.value.trim();
+    if (!text || chatSend?.disabled) return;
+
+    setAiExpanded(true);
+    appendMessage(text, "user");
+    chatInput.value = "";
+    setChatBusy(true);
+    setLlmStatus("busy", "Jetson LLM 分析中...");
+    const loadingBubble = appendMessage("正在調閱感測與歷史資料並生成分析…", "bot", "loading");
+
+    try {
+      const data = await askJetsonLLM(text);
+      loadingBubble?.remove();
+
+      if (data.status === "success") {
+        appendMessage(data.report || "AI 已完成分析，但沒有回傳文字報告。", "bot");
+        setLlmStatus("online", "Jetson LLM 在線中");
+      } else {
+        appendMessage(`分析失敗：${data.message || "後端未提供錯誤原因"}`, "bot", "alert");
+        setLlmStatus("online", "Jetson LLM 已連線");
+      }
+    } catch (err) {
+      loadingBubble?.remove();
+      appendMessage(`無法連接 AI 服務：${err.message || "網路連線錯誤"}`, "bot", "alert");
+      setLlmStatus("offline", "Jetson LLM 無法連線");
+      console.error("LLM query error:", err);
+    } finally {
+      setChatBusy(false);
+      chatInput?.focus();
+    }
+  }
+
+  chatSend?.addEventListener("click", handleUserSend);
+  chatInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) {
+      e.preventDefault();
+      handleUserSend();
+    }
   });
+
+  // 功能二：每 5 秒向 Jetson 查詢異常診斷。
+  // 用 signature 去重，避免後端一直回同一份 report 時每 5 秒重複警告。
+  let lastAnomalySignature = "";
+  let anomalyPolling = false;
+
+  async function pollLlmAnomaly() {
+    if (anomalyPolling) return;
+    anomalyPolling = true;
+
+    try {
+      const response = await fetch(`${getApiBase()}/api/llm/anomaly`, { cache: "no-store" });
+      let data;
+      try {
+        data = await response.json();
+      } catch (_) {
+        throw new Error(`異常 API 回傳格式錯誤 (HTTP ${response.status})`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.message || `異常 API 錯誤 (HTTP ${response.status})`);
+      }
+
+      setLlmStatus("online", "Jetson LLM 在線中");
+
+      if (data.has_anomaly && data.report) {
+        const signature = String(data.id || data.timestamp || data.report);
+        if (signature !== lastAnomalySignature) {
+          lastAnomalySignature = signature;
+          setAiExpanded(true);
+          appendMessage(`🚨 AI 異常診斷警報\n\n${data.report}`, "bot", "alert");
+        }
+      } else if (!data.has_anomaly) {
+        // 後端異常解除後允許下一次相同文字的異常再次觸發。
+        lastAnomalySignature = "";
+      }
+    } catch (err) {
+      setLlmStatus("offline", "Jetson LLM 無法連線");
+      console.error("LLM anomaly polling error:", err);
+    } finally {
+      anomalyPolling = false;
+    }
+  }
+
+  // 頁面載入後立刻確認一次，之後每 5 秒輪詢。
+  pollLlmAnomaly();
+  setInterval(pollLlmAnomaly, 5000);
   </script>
 </body>
 </html>
