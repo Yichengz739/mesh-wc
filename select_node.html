@@ -227,6 +227,20 @@
     .ai-title { font-weight: 800; font-size: 18px; color: #0f172a; }
     .ai-subtitle { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
     .ai-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(16,185,129,0.6); flex: 0 0 auto; }
+    .ai-header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .ai-clear-btn {
+      height: 38px;
+      padding: 0 12px;
+      border: 1px solid #dbe3ec;
+      border-radius: 11px;
+      background: #ffffff;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    .ai-clear-btn:hover { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
     .ai-collapse-btn { width: 38px; height: 38px; flex: 0 0 auto; font-size: 18px; }
 
     .ai-chat-body {
@@ -436,14 +450,13 @@
               <span id="ai-status-dot" class="ai-dot"></span><span id="ai-status-text">Jetson LLM 連線確認中...</span>
             </div>
           </div>
-          <button id="ai-close" class="ai-collapse-btn" type="button" aria-label="收合 AI 助理" title="收合 AI 助理">›</button>
-        </div>
-
-        <div class="ai-chat-body" id="chat-messages">
-          <div class="chat-msg bot">
-            你好！我是 Jetson LLM 設備助理。您可以問我關於廁所環境狀況、衛生紙或洗手液補充提醒！
+          <div class="ai-header-actions">
+            <button id="ai-clear" class="ai-clear-btn" type="button" aria-label="清除 AI 對話" title="清除所有已保存的 AI 對話">清除對話</button>
+            <button id="ai-close" class="ai-collapse-btn" type="button" aria-label="收合 AI 助理" title="收合 AI 助理">›</button>
           </div>
         </div>
+
+        <div class="ai-chat-body" id="chat-messages"></div>
 
         <div class="ai-input-area">
           <input type="text" id="chat-input" class="ai-input" placeholder="詢問設備狀況，例如：廁所 01 狀況如何？" />
@@ -614,7 +627,7 @@
   bindClick(r2, "JETSON_NANO_02");
 
   // ============================================
-  // ★ AI 對話互動邏輯：正式對接 Jetson Flask LLM API
+  // ★ AI 對話互動邏輯：正式對接 Jetson Flask LLM API + localStorage 對話保存
   // API contract:
   // POST /api/llm/query   body: { query: string }
   // GET  /api/llm/anomaly
@@ -629,6 +642,67 @@
   const aiStatusDot = document.getElementById("ai-status-dot");
   const aiRailStatus = document.getElementById("ai-rail-status");
   const aiStatusText = document.getElementById("ai-status-text");
+  const aiClearBtn = document.getElementById("ai-clear");
+
+  // === AI 對話持久化：同一瀏覽器切頁 / 重整 / 關閉再開都保留 ===
+  const AI_CHAT_STORAGE_KEY = "bleMesh.aiChatHistory.v1";
+  const AI_ANOMALY_SIGNATURE_KEY = "bleMesh.aiLastAnomalySignature.v1";
+  const AI_CHAT_MAX_MESSAGES = 100;
+  const AI_WELCOME_MESSAGE = "你好！我是 Jetson LLM 設備助理。您可以問我關於廁所環境狀況、衛生紙或洗手液補充提醒！";
+
+  let aiChatHistory = [];
+
+  function readChatHistory() {
+    try {
+      const raw = localStorage.getItem(AI_CHAT_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter(item => item && typeof item.text === "string")
+        .map(item => ({
+          text: item.text,
+          sender: item.sender === "user" ? "user" : "bot",
+          extraClass: item.extraClass === "alert" ? "alert" : "",
+          ts: Number(item.ts) || Date.now()
+        }))
+        .slice(-AI_CHAT_MAX_MESSAGES);
+    } catch (err) {
+      console.warn("無法讀取已保存的 AI 對話：", err);
+      return [];
+    }
+  }
+
+  function saveChatHistory() {
+    try {
+      aiChatHistory = aiChatHistory.slice(-AI_CHAT_MAX_MESSAGES);
+      localStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify(aiChatHistory));
+    } catch (err) {
+      console.warn("無法保存 AI 對話：", err);
+    }
+  }
+
+  function clearChatHistory() {
+    aiChatHistory = [];
+    try { localStorage.removeItem(AI_CHAT_STORAGE_KEY); } catch (_) {}
+    if (chatMessages) chatMessages.innerHTML = "";
+    appendMessage(AI_WELCOME_MESSAGE, "bot", "", true);
+  }
+
+  function restoreChatHistory() {
+    if (!chatMessages) return;
+    chatMessages.innerHTML = "";
+    aiChatHistory = readChatHistory();
+
+    if (!aiChatHistory.length) {
+      appendMessage(AI_WELCOME_MESSAGE, "bot", "", true);
+      return;
+    }
+
+    aiChatHistory.forEach(item => {
+      appendMessage(item.text, item.sender, item.extraClass, false);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 
   // 沿用 app.js 既有 API_BASE；若沒有定義，就使用目前網站同源 /api/*。
   function getApiBase() {
@@ -658,15 +732,37 @@
     }
   });
 
-  function appendMessage(text, sender = "bot", extraClass = "") {
+  function appendMessage(text, sender = "bot", extraClass = "", persist = true) {
     if (!chatMessages) return null;
+    const safeSender = sender === "user" ? "user" : "bot";
+    const safeExtraClass = extraClass === "alert" || extraClass === "loading" ? extraClass : "";
     const msgDiv = document.createElement("div");
-    msgDiv.className = `chat-msg ${sender}${extraClass ? ` ${extraClass}` : ""}`;
-    msgDiv.innerText = text;
+    msgDiv.className = `chat-msg ${safeSender}${safeExtraClass ? ` ${safeExtraClass}` : ""}`;
+    msgDiv.innerText = String(text ?? "");
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // loading 只是暫時狀態，不寫進 localStorage。
+    if (persist && safeExtraClass !== "loading") {
+      aiChatHistory.push({
+        text: String(text ?? ""),
+        sender: safeSender,
+        extraClass: safeExtraClass === "alert" ? "alert" : "",
+        ts: Date.now()
+      });
+      saveChatHistory();
+    }
     return msgDiv;
   }
+
+  restoreChatHistory();
+
+  aiClearBtn?.addEventListener("click", () => {
+    const ok = window.confirm("確定要清除所有已保存的 AI 對話嗎？");
+    if (!ok) return;
+    clearChatHistory();
+    chatInput?.focus();
+  });
 
   function setLlmStatus(state, label) {
     [aiStatusDot, aiRailStatus].forEach((el) => {
@@ -716,7 +812,7 @@
     chatInput.value = "";
     setChatBusy(true);
     setLlmStatus("busy", "Jetson LLM 分析中...");
-    const loadingBubble = appendMessage("正在調閱感測與歷史資料並生成分析…", "bot", "loading");
+    const loadingBubble = appendMessage("正在調閱感測與歷史資料並生成分析…", "bot", "loading", false);
 
     try {
       const data = await askJetsonLLM(text);
@@ -751,6 +847,7 @@
   // 功能二：每 5 秒向 Jetson 查詢異常診斷。
   // 用 signature 去重，避免後端一直回同一份 report 時每 5 秒重複警告。
   let lastAnomalySignature = "";
+  try { lastAnomalySignature = localStorage.getItem(AI_ANOMALY_SIGNATURE_KEY) || ""; } catch (_) {}
   let anomalyPolling = false;
 
   async function pollLlmAnomaly() {
@@ -776,12 +873,14 @@
         const signature = String(data.id || data.timestamp || data.report);
         if (signature !== lastAnomalySignature) {
           lastAnomalySignature = signature;
+          try { localStorage.setItem(AI_ANOMALY_SIGNATURE_KEY, signature); } catch (_) {}
           setAiExpanded(true);
           appendMessage(`🚨 AI 異常診斷警報\n\n${data.report}`, "bot", "alert");
         }
       } else if (!data.has_anomaly) {
         // 後端異常解除後允許下一次相同文字的異常再次觸發。
         lastAnomalySignature = "";
+        try { localStorage.removeItem(AI_ANOMALY_SIGNATURE_KEY); } catch (_) {}
       }
     } catch (err) {
       setLlmStatus("offline", "Jetson LLM 無法連線");
