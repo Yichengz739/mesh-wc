@@ -138,13 +138,13 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       padding: 16px 10px;
-      gap: 12px;
       background: #f8fafc;
       transition: opacity 0.18s ease, visibility 0.18s ease;
     }
 
-    .ai-rail-button, .ai-collapse-btn {
+    .ai-collapse-btn {
       width: 42px;
       height: 42px;
       border: 1px solid #dbe3ec;
@@ -158,34 +158,38 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     }
 
-    .ai-rail-button:hover, .ai-collapse-btn:hover {
+    .ai-collapse-btn:hover {
       background: #f1f5f9;
       box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
       transform: translateY(-1px);
     }
 
-    .ai-spark {
-      font-size: 20px;
-      line-height: 1;
-    }
-
-    .ai-rail-status {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 0 4px #d1fae5;
-    }
-
     .ai-rail-label {
-      margin-top: 2px;
+      appearance: none;
+      border: none;
+      background: transparent;
+      padding: 14px 10px;
+      margin: 0;
       writing-mode: vertical-rl;
       text-orientation: mixed;
       letter-spacing: 0.16em;
       font-size: 11px;
       font-weight: 800;
       color: #64748b;
+      cursor: pointer;
+      border-radius: 10px;
       user-select: none;
+      transition: color 0.2s ease, background 0.2s ease;
+    }
+
+    .ai-rail-label:hover {
+      color: #0f172a;
+      background: #eef2f6;
+    }
+
+    .ai-rail-label:focus-visible {
+      outline: 2px solid #94a3b8;
+      outline-offset: 2px;
     }
 
     .ai-content {
@@ -319,11 +323,11 @@
       border-left: 4px solid #e11d48;
       font-weight: 600;
     }
-    .ai-dot.busy, .ai-rail-status.busy {
+    .ai-dot.busy {
       background: #f59e0b;
       box-shadow: 0 0 0 4px #fef3c7;
     }
-    .ai-dot.offline, .ai-rail-status.offline {
+    .ai-dot.offline {
       background: #ef4444;
       box-shadow: 0 0 0 4px #fee2e2;
     }
@@ -435,11 +439,7 @@
     <!-- 3. 右側可收合 AI 對話視窗 -->
     <aside class="ai-panel" aria-label="AI 助理">
       <div class="ai-rail">
-        <button id="ai-open" class="ai-rail-button" type="button" aria-label="展開 AI 助理" title="開啟 AI 助理">
-          <span class="ai-spark">✦</span>
-        </button>
-        <span id="ai-rail-status" class="ai-rail-status" title="Jetson LLM 連線狀態"></span>
-        <div class="ai-rail-label">AI ASSISTANT</div>
+        <button id="ai-open" class="ai-rail-label" type="button" aria-label="展開 AI 助理" title="開啟 AI 助理">AI ASSISTANT</button>
       </div>
 
       <div class="ai-content" aria-hidden="true">
