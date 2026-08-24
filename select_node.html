@@ -20,16 +20,21 @@
       color: var(--text-main);
     }
     
-    /* 3 欄網格佈局：Sidebar(250px) | Main(1fr) | AI 視窗(320px) */
+    /* 3 欄網格佈局：Sidebar | Main | 可收合 AI 欄 */
     .dashboard-layout {
       display: grid;
-      grid-template-columns: 250px minmax(0, 1fr) 320px;
+      grid-template-columns: 250px minmax(0, 1fr) 64px;
       height: 100vh;
       max-width: 1440px;
       margin: 0 auto;
       background: rgba(255,255,255,0.5);
       box-shadow: 0 0 50px rgba(0,0,0,0.05);
       overflow: hidden;
+      transition: grid-template-columns 0.32s cubic-bezier(.4,0,.2,1);
+    }
+
+    .dashboard-layout.ai-expanded {
+      grid-template-columns: 250px minmax(0, 1fr) 360px;
     }
     
     /* === 與其他頁面統一的 Sidebar 樣式 === */
@@ -114,42 +119,131 @@
     .t-tag.warn { background: #fefce8; color: #ca8a04; border: 1px solid #fde047; }
     .t-tag.bad  { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
 
-    /* === 右側 AI 視窗樣式 === */
+    /* === 右側可收合 AI 助理 === */
     .ai-panel {
       background: #ffffff;
       border-left: 1px solid var(--border-light);
       display: flex;
       flex-direction: column;
       height: 100vh;
+      min-width: 0;
+      overflow: hidden;
+      position: relative;
+      box-shadow: -8px 0 24px rgba(15, 23, 42, 0.025);
     }
+
+    .ai-rail {
+      width: 64px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 10px;
+      gap: 12px;
+      background: #f8fafc;
+      transition: opacity 0.18s ease, visibility 0.18s ease;
+    }
+
+    .ai-rail-button, .ai-collapse-btn {
+      width: 42px;
+      height: 42px;
+      border: 1px solid #dbe3ec;
+      border-radius: 14px;
+      background: #ffffff;
+      color: #0f172a;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .ai-rail-button:hover, .ai-collapse-btn:hover {
+      background: #f1f5f9;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
+      transform: translateY(-1px);
+    }
+
+    .ai-spark {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .ai-rail-status {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 0 4px #d1fae5;
+    }
+
+    .ai-rail-label {
+      margin-top: 2px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: 0.16em;
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      user-select: none;
+    }
+
+    .ai-content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      min-width: 360px;
+      background: #fff;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(12px);
+      transition: opacity 0.2s ease 0.08s, transform 0.28s ease, visibility 0.28s;
+    }
+
+    .dashboard-layout.ai-expanded .ai-rail {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .dashboard-layout.ai-expanded .ai-content {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+    }
+
     .ai-header {
-      padding: 20px;
+      min-height: 76px;
+      padding: 16px 18px;
       border-bottom: 1px solid var(--border-light);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
       background: #f8fafc;
     }
-    .ai-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .ai-title-wrap { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .ai-title { font-weight: 800; font-size: 18px; color: #0f172a; }
     .ai-subtitle { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-    .ai-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(16,185,129,0.6); }
+    .ai-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(16,185,129,0.6); flex: 0 0 auto; }
+    .ai-collapse-btn { width: 38px; height: 38px; flex: 0 0 auto; font-size: 18px; }
 
     .ai-chat-body {
       flex: 1;
-      padding: 16px;
+      padding: 18px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      background: #fafafa;
+      background: linear-gradient(180deg, #fbfdff 0%, #f8fafc 100%);
     }
     .chat-msg {
-      max-width: 85%;
-      padding: 10px 14px;
-      border-radius: 12px;
+      max-width: 88%;
+      padding: 11px 14px;
+      border-radius: 14px;
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.55;
       word-wrap: break-word;
     }
     .chat-msg.bot {
@@ -157,18 +251,18 @@
       color: #1e293b;
       align-self: flex-start;
       border: 1px solid #e2e8f0;
-      border-bottom-left-radius: 2px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 4px 12px rgba(15,23,42,0.04);
     }
     .chat-msg.user {
       background: #0f172a;
       color: #ffffff;
       align-self: flex-end;
-      border-bottom-right-radius: 2px;
+      border-bottom-right-radius: 4px;
     }
 
     .ai-input-area {
-      padding: 16px;
+      padding: 14px;
       border-top: 1px solid var(--border-light);
       background: #fff;
       display: flex;
@@ -176,29 +270,32 @@
     }
     .ai-input {
       flex: 1;
+      min-width: 0;
       border: 1px solid var(--border-light);
-      border-radius: 10px;
-      padding: 10px 12px;
+      border-radius: 12px;
+      padding: 11px 12px;
       font-size: 14px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .ai-input:focus { border-color: #0f172a; }
+    .ai-input:focus { border-color: #94a3b8; box-shadow: 0 0 0 3px #f1f5f9; }
     .ai-send-btn {
       background: #0f172a;
       color: #fff;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       padding: 0 16px;
       font-weight: 700;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: transform 0.2s ease, opacity 0.2s;
     }
-    .ai-send-btn:hover { opacity: 0.9; }
+    .ai-send-btn:hover { opacity: 0.92; transform: translateY(-1px); }
 
     @media (max-width: 1100px){
-      .dashboard-layout{ grid-template-columns: 250px 1fr; }
-      .ai-panel { display: none; }
+      .dashboard-layout{ grid-template-columns: 250px minmax(0, 1fr) 56px; }
+      .dashboard-layout.ai-expanded{ grid-template-columns: 250px minmax(0, 1fr) 320px; }
+      .ai-rail { width: 56px; padding-left: 7px; padding-right: 7px; }
+      .ai-content { min-width: 320px; }
     }
     @media (max-width: 900px){
       .dashboard-layout{ grid-template-columns: 1fr; margin:0; border-radius:0; height: 100vh; }
@@ -217,6 +314,7 @@
       .menu { flex-direction: row; margin-top: 0; }
       .menu-item { padding: 8px 12px; font-size: 14px; }
       .map-card { flex: 1; }
+      .ai-panel { display: none; }
     }
   </style>
 </head>
@@ -297,26 +395,37 @@
       </div>
     </main>
 
-    <!-- 3. 右側 AI 對話視窗 -->
-    <aside class="ai-panel">
-      <div class="ai-header">
-        <div class="ai-title-wrap">
-          <div class="ai-title">AI 助理</div>
-          <div class="ai-subtitle">
-            <span class="ai-dot"></span> Jetson LLM 在線中
+    <!-- 3. 右側可收合 AI 對話視窗 -->
+    <aside class="ai-panel" aria-label="AI 助理">
+      <div class="ai-rail">
+        <button id="ai-open" class="ai-rail-button" type="button" aria-label="展開 AI 助理" title="開啟 AI 助理">
+          <span class="ai-spark">✦</span>
+        </button>
+        <span class="ai-rail-status" title="Jetson LLM 在線中"></span>
+        <div class="ai-rail-label">AI ASSISTANT</div>
+      </div>
+
+      <div class="ai-content" aria-hidden="true">
+        <div class="ai-header">
+          <div class="ai-title-wrap">
+            <div class="ai-title">AI 助理</div>
+            <div class="ai-subtitle">
+              <span class="ai-dot"></span> Jetson LLM 在線中
+            </div>
+          </div>
+          <button id="ai-close" class="ai-collapse-btn" type="button" aria-label="收合 AI 助理" title="收合 AI 助理">›</button>
+        </div>
+
+        <div class="ai-chat-body" id="chat-messages">
+          <div class="chat-msg bot">
+            你好！我是 Jetson LLM 設備助理。您可以問我關於廁所環境狀況、衛生紙或洗手液補充提醒！
           </div>
         </div>
-      </div>
 
-      <div class="ai-chat-body" id="chat-messages">
-        <div class="chat-msg bot">
-          你好！我是 Jetson LLM 設備助理。您可以問我關於廁所環境狀況、衛生紙或洗手液補充提醒！
+        <div class="ai-input-area">
+          <input type="text" id="chat-input" class="ai-input" placeholder="詢問設備狀況，例如：廁所 01 狀況如何？" />
+          <button id="chat-send" class="ai-send-btn" type="button">發送</button>
         </div>
-      </div>
-
-      <div class="ai-input-area">
-        <input type="text" id="chat-input" class="ai-input" placeholder="詢問設備狀況 (例如: 廁所01狀況如何？)..." />
-        <button id="chat-send" class="ai-send-btn">發送</button>
       </div>
     </aside>
   </div>
@@ -484,6 +593,32 @@
   // ============================================
   // ★ AI 對話互動邏輯 (對接 Jetson 後端 LLM)
   // ============================================
+  const dashboardLayout = document.querySelector(".dashboard-layout");
+  const aiOpenBtn = document.getElementById("ai-open");
+  const aiCloseBtn = document.getElementById("ai-close");
+  const aiContent = document.querySelector(".ai-content");
+
+  function setAiExpanded(expanded) {
+    if (!dashboardLayout || !aiContent) return;
+    dashboardLayout.classList.toggle("ai-expanded", expanded);
+    aiContent.setAttribute("aria-hidden", expanded ? "false" : "true");
+    if (expanded) {
+      window.setTimeout(() => document.getElementById("chat-input")?.focus(), 260);
+    }
+  }
+
+  aiOpenBtn?.addEventListener("click", () => setAiExpanded(true));
+  aiCloseBtn?.addEventListener("click", () => setAiExpanded(false));
+
+  // 預設保持收合；Esc 可快速收回
+  setAiExpanded(false);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && dashboardLayout?.classList.contains("ai-expanded")) {
+      setAiExpanded(false);
+      aiOpenBtn?.focus();
+    }
+  });
+
   const chatMessages = document.getElementById("chat-messages");
   const chatInput = document.getElementById("chat-input");
   const chatSend = document.getElementById("chat-send");
