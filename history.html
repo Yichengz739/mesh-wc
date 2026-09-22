@@ -123,6 +123,177 @@
       .menu { flex-direction: row; margin-top: 0; } .menu-item { padding: 8px 12px; font-size: 14px; }
       .main { padding: 24px; }
     }
+  
+    /* === Shared right-side AI assistant === */
+    .dashboard-layout{
+      grid-template-columns: 250px minmax(0, 1fr) 64px !important;
+      height: 100vh;
+      overflow: hidden;
+      transition: grid-template-columns 0.32s cubic-bezier(.4,0,.2,1);
+    }
+    .dashboard-layout.ai-expanded{
+      grid-template-columns: 250px minmax(0, 1fr) 360px !important;
+    }
+
+    .ai-panel{
+      background:#fff;
+      border-left:1px solid #e2e8f0;
+      display:flex;
+      flex-direction:column;
+      height:100vh;
+      min-width:0;
+      overflow:hidden;
+      position:relative;
+      box-shadow:-8px 0 24px rgba(15,23,42,.025);
+    }
+    .ai-rail{
+      width:64px;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px 10px;
+      background:#f8fafc;
+      transition:opacity .18s ease, visibility .18s ease;
+    }
+    .ai-rail-label{
+      appearance:none;
+      border:none;
+      background:transparent;
+      padding:14px 10px;
+      writing-mode:vertical-rl;
+      text-orientation:mixed;
+      letter-spacing:.16em;
+      font-size:11px;
+      font-weight:800;
+      color:#64748b;
+      cursor:pointer;
+      border-radius:10px;
+      user-select:none;
+    }
+    .ai-rail-label:hover{ color:#0f172a; background:#eef2f6; }
+
+    .ai-content{
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      min-width:360px;
+      background:#fff;
+      opacity:0;
+      visibility:hidden;
+      transform:translateX(12px);
+      transition:opacity .2s ease .08s, transform .28s ease, visibility .28s;
+    }
+    .dashboard-layout.ai-expanded .ai-rail{
+      opacity:0;
+      visibility:hidden;
+      pointer-events:none;
+    }
+    .dashboard-layout.ai-expanded .ai-content{
+      opacity:1;
+      visibility:visible;
+      transform:translateX(0);
+    }
+    .ai-header{
+      min-height:76px;
+      padding:16px 18px;
+      border-bottom:1px solid #e2e8f0;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:#f8fafc;
+    }
+    .ai-title-wrap{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+    .ai-title{ font-weight:800; font-size:18px; color:#0f172a; }
+    .ai-subtitle{ font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px; }
+    .ai-dot{
+      width:8px;height:8px;background:#10b981;border-radius:50%;
+      display:inline-block;box-shadow:0 0 6px rgba(16,185,129,.6);flex:0 0 auto;
+    }
+    .ai-dot.busy{ background:#f59e0b; box-shadow:0 0 0 4px #fef3c7; }
+    .ai-dot.offline{ background:#ef4444; box-shadow:0 0 0 4px #fee2e2; }
+
+    .ai-header-actions{ display:flex; align-items:center; gap:8px; }
+    .ai-clear-btn,.ai-collapse-btn{
+      height:38px;
+      border:1px solid #dbe3ec;
+      border-radius:11px;
+      background:#fff;
+      color:#64748b;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .ai-clear-btn{ padding:0 12px; font-size:12px; }
+    .ai-collapse-btn{ width:38px; font-size:18px; }
+    .ai-clear-btn:hover{ background:#fff1f2; color:#be123c; border-color:#fecdd3; }
+
+    .ai-chat-body{
+      flex:1;
+      padding:18px;
+      overflow-y:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      background:linear-gradient(180deg,#fbfdff 0%,#f8fafc 100%);
+    }
+    .chat-msg{
+      max-width:88%;
+      padding:11px 14px;
+      border-radius:14px;
+      font-size:14px;
+      line-height:1.55;
+      word-wrap:break-word;
+      white-space:pre-wrap;
+    }
+    .chat-msg.bot{
+      background:#fff;color:#1e293b;align-self:flex-start;
+      border:1px solid #e2e8f0;border-bottom-left-radius:4px;
+      box-shadow:0 4px 12px rgba(15,23,42,.04);
+    }
+    .chat-msg.user{
+      background:#0f172a;color:#fff;align-self:flex-end;
+      border-bottom-right-radius:4px;
+    }
+    .chat-msg.loading{ color:#64748b; font-style:italic; background:#f8fafc; }
+    .chat-msg.alert{
+      max-width:100%;background:#fff1f2;color:#9f1239;
+      border:1px solid #fecdd3;border-left:4px solid #e11d48;font-weight:600;
+    }
+
+    .ai-input-area{
+      padding:14px;border-top:1px solid #e2e8f0;background:#fff;
+      display:flex;gap:8px;
+    }
+    .ai-input{
+      flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:12px;
+      padding:11px 12px;font-size:14px;outline:none;
+    }
+    .ai-input:focus{ border-color:#94a3b8; box-shadow:0 0 0 3px #f1f5f9; }
+    .ai-send-btn{
+      background:#0f172a;color:#fff;border:none;border-radius:12px;
+      padding:0 16px;font-weight:700;cursor:pointer;
+    }
+    .ai-send-btn:disabled,.ai-input:disabled{ opacity:.58; cursor:not-allowed; }
+
+    @media (max-width:1100px){
+      .dashboard-layout{ grid-template-columns:250px minmax(0,1fr) 56px !important; }
+      .dashboard-layout.ai-expanded{ grid-template-columns:250px minmax(0,1fr) 320px !important; }
+      .ai-rail{ width:56px; padding-left:7px; padding-right:7px; }
+      .ai-content{ min-width:320px; }
+    }
+    @media (max-width:900px){
+      .dashboard-layout,
+      .dashboard-layout.ai-expanded{
+        grid-template-columns:1fr !important;
+        height:auto;
+        min-height:100vh;
+        overflow:visible;
+      }
+      .ai-panel{ display:none; }
+    }
+
   </style>
 </head>
 <body>
@@ -185,9 +356,43 @@
         <div class="muted" id="chart-note">提示：您可以使用滾輪縮放圖表，或拖曳平移</div>
       </div>
     </main>
+
+    <aside class="ai-panel" aria-label="AI 助理">
+      <div class="ai-rail">
+        <button id="ai-open" class="ai-rail-label" type="button"
+                aria-label="展開 AI 助理" title="開啟 AI 助理">AI ASSISTANT</button>
+      </div>
+
+      <div class="ai-content" aria-hidden="true">
+        <div class="ai-header">
+          <div class="ai-title-wrap">
+            <div class="ai-title">AI 助理</div>
+            <div class="ai-subtitle">
+              <span id="ai-status-dot" class="ai-dot"></span>
+              <span id="ai-status-text">Jetson LLM 連線確認中...</span>
+            </div>
+          </div>
+          <div class="ai-header-actions">
+            <button id="ai-clear" class="ai-clear-btn" type="button">清除對話</button>
+            <button id="ai-close" class="ai-collapse-btn" type="button"
+                    aria-label="收合 AI 助理" title="收合 AI 助理">›</button>
+          </div>
+        </div>
+
+        <div class="ai-chat-body" id="chat-messages"></div>
+
+        <div class="ai-input-area">
+          <input type="text" id="chat-input" class="ai-input"
+                 placeholder="詢問設備狀況，例如：廁所 01 狀況如何？" />
+          <button id="chat-send" class="ai-send-btn" type="button">發送</button>
+        </div>
+      </div>
+    </aside>
+
   </div>
   
   <script src="./app.js"></script>
+  <script src="./ai-assistant.js"></script>
   
   <script>
     // ==========================================
