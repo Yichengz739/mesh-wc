@@ -743,16 +743,38 @@
         else if (data.env_score >= 60) scoreCircle.style.borderColor = "var(--c-warn)";
         else scoreCircle.style.borderColor = "var(--c-bad)";
 
-        // 4. 更新數值 (加上安全判斷，避免 toFixed 報錯)
+        // 4. 更新數值與燈號 (溫度/濕度/PPM 統一處理 null 情況，避免離線時誤顯示綠燈)
         if (data.sensors) {
-            updateValue('val-temp', data.sensors.temp ? data.sensors.temp.toFixed(1) : "--");
-            updateValue('val-hum', data.sensors.hum ? data.sensors.hum.toFixed(0) : "--");
-            updateValue('val-ppm', data.sensors.mq135 ? data.sensors.mq135.toFixed(0) : "--");
+            const temp = data.sensors.temp;
+            const hum = data.sensors.hum;
+            const ppm = data.sensors.mq135;
 
-            // 5. 更新燈號
-            updateLed('led-temp', data.sensors.temp > 33 ? 'bad' : (data.sensors.temp > 30 ? 'warn' : 'good'));
-            updateLed('led-hum', data.sensors.hum > 80 ? 'warn' : 'good');
-            updateLed('led-ppm', data.sensors.mq135 > 200 ? 'bad' : (data.sensors.mq135 > 150 ? 'warn' : 'good'));
+            // 溫度
+            if (temp === null || temp === undefined || !Number.isFinite(Number(temp))) {
+                updateValue('val-temp', "--");
+                updateLed('led-temp', 'bad');
+            } else {
+                updateValue('val-temp', Number(temp).toFixed(1));
+                updateLed('led-temp', Number(temp) > 33 ? 'bad' : (Number(temp) > 30 ? 'warn' : 'good'));
+            }
+
+            // 濕度
+            if (hum === null || hum === undefined || !Number.isFinite(Number(hum))) {
+                updateValue('val-hum', "--");
+                updateLed('led-hum', 'bad');
+            } else {
+                updateValue('val-hum', Number(hum).toFixed(0));
+                updateLed('led-hum', Number(hum) > 80 ? 'warn' : 'good');
+            }
+
+            // 異味 PPM
+            if (ppm === null || ppm === undefined || !Number.isFinite(Number(ppm))) {
+                updateValue('val-ppm', "--");
+                updateLed('led-ppm', 'bad');
+            } else {
+                updateValue('val-ppm', Number(ppm).toFixed(0));
+                updateLed('led-ppm', Number(ppm) > 200 ? 'bad' : (Number(ppm) > 150 ? 'warn' : 'good'));
+            }
         }
 
         // 6. 衛生紙與洗手液狀態
