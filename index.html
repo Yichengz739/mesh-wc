@@ -755,28 +755,57 @@
             updateLed('led-ppm', data.sensors.mq135 > 200 ? 'bad' : (data.sensors.mq135 > 150 ? 'warn' : 'good'));
         }
 
-        // 6. 統一的衛生紙與洗手液邏輯
+        // 6. 衛生紙與洗手液狀態
+        // 後端現在會在感測器逾時/離線時回傳 null。
+        // null / undefined 不可再被當成「充足」。
         if (hardwareData && hardwareData.sensors) {
+          // =========================
+          // 衛生紙
+          // =========================
           const dist = hardwareData.sensors.dist;
           const paperText = document.getElementById('val-paper');
-          if (dist > 15) {
-            paperText.innerText = "缺紙!";
-            updateLed('led-paper', 'bad');
-          } else if (dist > 12) {
-            paperText.innerText = "即將用盡";
-            updateLed('led-paper', 'warn');
-          } else {
-            paperText.innerText = "充足";
-            updateLed('led-paper', 'good');
+
+          if (paperText) {
+            if (
+              dist === null ||
+              dist === undefined ||
+              dist === "" ||
+              !Number.isFinite(Number(dist))
+            ) {
+              paperText.innerText = "未連線";
+              updateLed('led-paper', 'bad');
+            } else if (Number(dist) > 15) {
+              paperText.innerText = "缺紙!";
+              updateLed('led-paper', 'bad');
+            } else if (Number(dist) > 12) {
+              paperText.innerText = "即將用盡";
+              updateLed('led-paper', 'warn');
+            } else {
+              paperText.innerText = "充足";
+              updateLed('led-paper', 'good');
+            }
           }
 
+          // =========================
+          // 洗手液
+          // =========================
+          const liquid = hardwareData.sensors.liquid;
           const liquidText = document.getElementById('val-liquid');
-          if (hardwareData.sensors.liquid === 1) {
-            liquidText.innerText = "正常";
-            updateLed('led-liquid', 'good');
-          } else {
-            liquidText.innerText = "需補充";
-            updateLed('led-liquid', 'bad');
+
+          if (liquidText) {
+            if (liquid === null || liquid === undefined || liquid === "") {
+              liquidText.innerText = "未連線";
+              updateLed('led-liquid', 'bad');
+            } else if (Number(liquid) === 1) {
+              liquidText.innerText = "充足";
+              updateLed('led-liquid', 'good');
+            } else if (Number(liquid) === 0) {
+              liquidText.innerText = "需補充";
+              updateLed('led-liquid', 'bad');
+            } else {
+              liquidText.innerText = "異常";
+              updateLed('led-liquid', 'bad');
+            }
           }
         }
 

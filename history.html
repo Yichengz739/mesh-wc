@@ -462,7 +462,15 @@
                 const data = await res.json();
                 
                 const records = data.values || [];
-                const plotData = records.map(r => ({ x: new Date(r.ts), y: r.value }));
+
+                // null / undefined 代表感測器離線，不要畫成 0
+                const plotData = records
+                    .filter(r => r.value !== null && r.value !== undefined)
+                    .map(r => ({
+                        x: new Date(r.ts),
+                        y: Number(r.value)
+                    }))
+                    .filter(p => !Number.isNaN(p.x.getTime()) && Number.isFinite(p.y));
 
                 if(myChart) myChart.destroy();
 
