@@ -374,6 +374,7 @@
           <a class="menu-item" href="./index.html">即時狀況</a>
           <a class="menu-item" href="./history.html">歷史紀錄</a>
           <a class="menu-item" href="./realtime_status.html">佔用偵測</a>
+          <a class="menu-item" href="https://api.mesh-wc.xyz/static/forecast.html" target="_blank" rel="noopener">耗材預測</a>
         </div>
       </div>
       
@@ -447,7 +448,7 @@
           <div class="ai-title-wrap">
             <div class="ai-title">AI 助理</div>
             <div class="ai-subtitle">
-              <span id="ai-status-dot" class="ai-dot"></span><span id="ai-status-text">Jetson LLM 連線確認中...</span>
+              <span id="ai-status-dot" class="ai-dot"></span><span id="ai-status-text">AI 助理（雲端 Gemini）連線確認中...</span>
             </div>
           </div>
           <div class="ai-header-actions">
@@ -459,7 +460,7 @@
         <div class="ai-chat-body" id="chat-messages"></div>
 
         <div class="ai-input-area">
-          <input type="text" id="chat-input" class="ai-input" placeholder="詢問設備狀況，例如：廁所 01 狀況如何？" />
+          <input type="text" id="chat-input" class="ai-input" placeholder="例如：廁所一狀況如何？明天幾點要補洗手液？" />
           <button id="chat-send" class="ai-send-btn" type="button">發送</button>
         </div>
       </div>
@@ -648,7 +649,7 @@
   const AI_CHAT_STORAGE_KEY = "bleMesh.aiChatHistory.v1";
   const AI_ANOMALY_SIGNATURE_KEY = "bleMesh.aiLastAnomalySignature.v1";
   const AI_CHAT_MAX_MESSAGES = 100;
-  const AI_WELCOME_MESSAGE = "你好！我是 Jetson LLM 設備助理。您可以問我關於廁所環境狀況、衛生紙或洗手液補充提醒！";
+  const AI_WELCOME_MESSAGE = "你好！我是 AI 設備助理，會根據 Jetson 收集的感測數據回答。您可以問我廁所環境狀況，或耗材補充預測，例如：「明天幾點要補洗手液？」「廁所一衛生紙什麼時候會用完？」";
 
   let aiChatHistory = [];
 
@@ -784,11 +785,25 @@
 
   // 功能一：將管理員自然語言問題送到 Jetson / Flask / LLM
   async function askJetsonLLM(query) {
-    const response = await fetch(`${getApiBase()}/api/llm/query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query })
-    });
+    // 最多等 150 秒；後端遇到 Gemini 卡住時最壞約 2 分 15 秒才回錯誤
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 150000);
+    let response;
+    try {
+      response = await fetch(`${getApiBase()}/api/llm/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+        signal: controller.signal
+      });
+    } catch (err) {
+      if (err.name === "AbortError") {
+        throw new Error("AI 助理回應逾時（超過 150 秒），請稍後再試");
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
 
     let data;
     try {
@@ -811,7 +826,7 @@
     appendMessage(text, "user");
     chatInput.value = "";
     setChatBusy(true);
-    setLlmStatus("busy", "Jetson LLM 分析中...");
+    setLlmStatus("busy", "AI 助理分析中...");
     const loadingBubble = appendMessage("正在調閱感測與歷史資料並生成分析…", "bot", "loading", false);
 
     try {
@@ -820,15 +835,15 @@
 
       if (data.status === "success") {
         appendMessage(data.report || "AI 已完成分析，但沒有回傳文字報告。", "bot");
-        setLlmStatus("online", "Jetson LLM 在線中");
+        setLlmStatus("online", "AI 助理在線中（雲端 Gemini）");
       } else {
         appendMessage(`分析失敗：${data.message || "後端未提供錯誤原因"}`, "bot", "alert");
-        setLlmStatus("online", "Jetson LLM 已連線");
+        setLlmStatus("online", "AI 助理已連線（雲端 Gemini）");
       }
     } catch (err) {
       loadingBubble?.remove();
       appendMessage(`無法連接 AI 服務：${err.message || "網路連線錯誤"}`, "bot", "alert");
-      setLlmStatus("offline", "Jetson LLM 無法連線");
+      setLlmStatus("offline", "AI 助理無法連線");
       console.error("LLM query error:", err);
     } finally {
       setChatBusy(false);
@@ -867,7 +882,7 @@
         throw new Error(data?.message || `異常 API 錯誤 (HTTP ${response.status})`);
       }
 
-      setLlmStatus("online", "Jetson LLM 在線中");
+      setLlmStatus("online", "AI 助理在線中（雲端 Gemini）");
 
       if (data.has_anomaly && data.report) {
         const signature = String(data.id || data.timestamp || data.report);
@@ -883,7 +898,7 @@
         try { localStorage.removeItem(AI_ANOMALY_SIGNATURE_KEY); } catch (_) {}
       }
     } catch (err) {
-      setLlmStatus("offline", "Jetson LLM 無法連線");
+      setLlmStatus("offline", "AI 助理無法連線");
       console.error("LLM anomaly polling error:", err);
     } finally {
       anomalyPolling = false;
